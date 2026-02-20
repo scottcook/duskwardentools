@@ -5,7 +5,13 @@ export default function LandingPage() {
     <div className="min-h-screen flex flex-col bg-bg-base">
       <header className="border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-accent" style={{ fontFamily: 'var(--font-unifraktur)' }}>Duskwarden</h1>
+          <Link
+            href="/app"
+            className="text-4xl text-text-primary hover:text-accent transition-colors"
+            style={{ fontFamily: 'var(--font-unifraktur)' }}
+          >
+            Duskwarden
+          </Link>
           <Link
             href="/app"
             className="px-4 py-2 bg-accent text-bg-base font-medium rounded-lg hover:bg-accent-hover transition-colors focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-bg-base"
