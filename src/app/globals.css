@@ -1,26 +1,130 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg-base: #0a0a0a;
+  --bg-surface: #1a1a1a;
+  --bg-elevated: #262626;
+  --text-primary: #f5f5f5;
+  --text-muted: #a3a3a3;
+  --accent: #d4a574;
+  --accent-hover: #e5b885;
+  --border: #333333;
+  --error: #ef4444;
+  --success: #22c55e;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-bg-base: var(--bg-base);
+  --color-bg-surface: var(--bg-surface);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-text-primary: var(--text-primary);
+  --color-text-muted: var(--text-muted);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-border: var(--border);
+  --color-error: var(--error);
+  --color-success: var(--success);
+  --font-sans: 'Montserrat', sans-serif;
+  --font-unifraktur: 'UnifrakturCook', serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
+}
+
+html {
+  /* Stone texture on the root element — always below every div/stacking context */
+  background-color: var(--bg-base);
+  background-image: url('/stone-wall.png');
+  background-repeat: repeat;
+  background-size: 512px 512px;
+  background-attachment: fixed;
+  /* Multiply blends the near-black texture into the near-black base color,
+     making it visible as a subtle stone relief without brightening the page */
+  background-blend-mode: luminosity;
+  /* At 12% image opacity-equivalent: achieved via the blend + a semitransparent
+     overlay on body rather than reducing image opacity directly */
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  /* Transparent so the html background shows through */
+  background-color: rgb(10 10 10 / 0.89);
+  color: var(--text-primary);
+  font-family: 'Montserrat', sans-serif;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--bg-base);
+}
+
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 12pt;
+  }
+
+  html {
+    background-image: none !important;
+    background-color: white !important;
+  }
+  
+  .no-print {
+    display: none !important;
+  }
+  
+  .print-only {
+    display: block !important;
+  }
+
+  header, footer, nav {
+    display: none !important;
+  }
+
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .bg-bg-surface, .bg-bg-elevated, .bg-bg-base {
+    background: white !important;
+  }
+
+  .border-border, .border {
+    border-color: #ccc !important;
+  }
+
+  .text-text-primary {
+    color: black !important;
+  }
+
+  .text-text-muted {
+    color: #666 !important;
+  }
+
+  .text-accent {
+    color: #8b5a2b !important;
+  }
+
+  a {
+    text-decoration: none !important;
+  }
+
+  @page {
+    margin: 0.5in;
+  }
+}
+
+.print-only {
+  display: none;
 }
