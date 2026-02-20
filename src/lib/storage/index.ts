@@ -1,23 +1,19 @@
 /**
  * Storage layer for Duskwarden Tools.
  *
- * Uses Supabase as the primary store. Falls back to localStorage
- * when the Supabase call fails (e.g. offline or during SSR).
+ * Uses Supabase as the primary store with device-based Row Level Security.
+ * Each user's data is isolated to their browser via a device_id stored in
+ * localStorage and passed to Supabase via the x-device-id header.
  *
- * No auth is required – the anon key has full table access via
- * migration 00002 (RLS disabled, anon role granted).
+ * Falls back to localStorage when the Supabase call fails (e.g. offline or during SSR).
  */
 
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type { Entry, Project } from '@/types';
 
 // ─────────────────────────────────────────────────────────────
-// Supabase client (anon, no auth needed)
+// Device ID management
 // ─────────────────────────────────────────────────────────────
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 // A stable, browser-scoped device ID used as user_id for all records.
 function getDeviceId(): string {
@@ -28,6 +24,44 @@ function getDeviceId(): string {
     localStorage.setItem('dw_device_id', id);
   }
   return id;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Supabase client with device_id header for RLS
+// ─────────────────────────────────────────────────────────────
+
+// Cache the client instance per device ID to avoid recreating
+let cachedClient: SupabaseClient | null = null;
+let cachedDeviceId: string | null = null;
+
+function getSupabaseClient(): SupabaseClient {
+  const deviceId = getDeviceId();
+  
+  // Return cached client if device ID hasn't changed
+  if (cachedClient && cachedDeviceId === deviceId) {
+    return cachedClient;
+  }
+  
+  // Create new client with device_id in global headers
+  cachedClient = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      global: {
+        headers: {
+          'x-device-id': deviceId,
+        },
+      },
+    }
+  );
+  cachedDeviceId = deviceId;
+  
+  return cachedClient;
+}
+
+// Getter for the supabase client (always use this, not a static instance)
+function supabase(): SupabaseClient {
+  return getSupabaseClient();
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -51,7 +85,7 @@ function lsSet<T>(key: string, data: T[]): void {
 // Entries
 // ─────────────────────────────────────────────────────────────
 export async function getEntries(): Promise<Entry[]> {
-  const { data, error } = await supabase
+  const { data, error } = await supabase()
     .from('entries')
     .select('*')
     .order('updated_at', { ascending: false });
@@ -64,7 +98,7 @@ export async function getEntries(): Promise<Entry[]> {
 }
 
 export async function getEntry(id: string): Promise<Entry | undefined> {
-  const { data, error } = await supabase
+  const { data, error } = await supabase()
     .from('entries')
     .select('*')
     .eq('id', id)
@@ -88,7 +122,7 @@ export async function saveEntry(
     updated_at: now,
   };
 
-  const { data, error } = await supabase
+  const { data, error } = await supabase()
     .from('entries')
     .insert(newEntry)
     .select()
@@ -110,7 +144,7 @@ export async function updateEntry(
 ): Promise<Entry | undefined> {
   const payload = { ...updates, updated_at: new Date().toISOString() };
 
-  const { data, error } = await supabase
+  const { data, error } = await supabase()
     .from('entries')
     .update(payload)
     .eq('id', id)
@@ -129,7 +163,7 @@ export async function updateEntry(
 }
 
 export async function deleteEntry(id: string): Promise<boolean> {
-  const { error } = await supabase.from('entries').delete().eq('id', id);
+  const { error } = await supabase().from('entries').delete().eq('id', id);
 
   if (error) {
     const entries = lsGet<Entry>(LS_ENTRIES);
@@ -145,7 +179,7 @@ export async function deleteEntry(id: string): Promise<boolean> {
 // Projects
 // ─────────────────────────────────────────────────────────────
 export async function getProjects(): Promise<Project[]> {
-  const { data, error } = await supabase
+  const { data, error } = await supabase()
     .from('projects')
     .select('*')
     .order('updated_at', { ascending: false });
@@ -158,7 +192,7 @@ export async function getProjects(): Promise<Project[]> {
 }
 
 export async function getProject(id: string): Promise<Project | undefined> {
-  const { data, error } = await supabase
+  const { data, error } = await supabase()
     .from('projects')
     .select('*')
     .eq('id', id)
@@ -182,7 +216,7 @@ export async function saveProject(
     updated_at: now,
   };
 
-  const { data, error } = await supabase
+  const { data, error } = await supabase()
     .from('projects')
     .insert(newProject)
     .select()
@@ -204,7 +238,7 @@ export async function updateProject(
 ): Promise<Project | undefined> {
   const payload = { ...updates, updated_at: new Date().toISOString() };
 
-  const { data, error } = await supabase
+  const { data, error } = await supabase()
     .from('projects')
     .update(payload)
     .eq('id', id)
@@ -223,7 +257,7 @@ export async function updateProject(
 }
 
 export async function deleteProject(id: string): Promise<boolean> {
-  const { error } = await supabase.from('projects').delete().eq('id', id);
+  const { error } = await supabase().from('projects').delete().eq('id', id);
 
   if (error) {
     const projects = lsGet<Project>(LS_PROJECTS);
@@ -237,7 +271,7 @@ export async function deleteProject(id: string): Promise<boolean> {
   }
 
   // also null-out project_id on entries in Supabase
-  await supabase.from('entries').update({ project_id: null }).eq('project_id', id);
+  await supabase().from('entries').update({ project_id: null }).eq('project_id', id);
   return true;
 }
 
@@ -245,10 +279,11 @@ export async function deleteProject(id: string): Promise<boolean> {
 // Dashboard helpers
 // ─────────────────────────────────────────────────────────────
 export async function getEntriesCount(): Promise<{ creatures: number; notes: number; projects: number }> {
+  const client = supabase();
   const [creaturesRes, notesRes, projectsRes] = await Promise.all([
-    supabase.from('entries').select('id', { count: 'exact', head: true }).eq('type', 'creature'),
-    supabase.from('entries').select('id', { count: 'exact', head: true }).eq('type', 'adventure_note'),
-    supabase.from('projects').select('id', { count: 'exact', head: true }),
+    client.from('entries').select('id', { count: 'exact', head: true }).eq('type', 'creature'),
+    client.from('entries').select('id', { count: 'exact', head: true }).eq('type', 'adventure_note'),
+    client.from('projects').select('id', { count: 'exact', head: true }),
   ]);
 
   if (creaturesRes.error || notesRes.error || projectsRes.error) {
@@ -269,7 +304,7 @@ export async function getEntriesCount(): Promise<{ creatures: number; notes: num
 }
 
 export async function getRecentEntries(limit = 5): Promise<Entry[]> {
-  const { data, error } = await supabase
+  const { data, error } = await supabase()
     .from('entries')
     .select('*')
     .order('updated_at', { ascending: false })
@@ -324,7 +359,7 @@ function lsSetRef(entryId: string | null, rawText: string): void {
  */
 export async function getReferenceStatblock(entryId: string | null): Promise<string> {
   const deviceId = getDeviceId();
-  const query = supabase
+  const query = supabase()
     .from('device_reference_statblocks')
     .select('raw_text')
     .eq('device_id', deviceId);
@@ -348,7 +383,7 @@ export async function saveReferenceStatblock(
   const deviceId = getDeviceId();
   lsSetRef(entryId, rawText); // Always persist locally first
 
-  const { error } = await supabase
+  const { error } = await supabase()
     .from('device_reference_statblocks')
     .upsert(
       { device_id: deviceId, entry_id: entryId, raw_text: rawText },
@@ -366,7 +401,7 @@ export async function saveReferenceStatblock(
 export async function deleteReferenceStatblock(entryId: string | null): Promise<void> {
   lsSetRef(entryId, '');
   const deviceId = getDeviceId();
-  const query = supabase
+  const query = supabase()
     .from('device_reference_statblocks')
     .delete()
     .eq('device_id', deviceId);
