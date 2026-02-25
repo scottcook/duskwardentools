@@ -9,12 +9,13 @@ import type { Entry, Project, OutputCreatureData } from '@/types';
 
 function LibraryPageContent() {
   const searchParams = useSearchParams();
-  
+
   const [entries, setEntries] = useState<Entry[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [search, setSearch] = useState(searchParams.get('q') || '');
   const [typeFilter, setTypeFilter] = useState(searchParams.get('type') || '');
   const [projectFilter, setProjectFilter] = useState(searchParams.get('project') || '');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     getEntries().then(setEntries);
@@ -34,13 +35,13 @@ function LibraryPageContent() {
 
     if (search) {
       const query = search.toLowerCase();
-      result = result.filter(e => 
+      result = result.filter(e =>
         e.title.toLowerCase().includes(query) ||
         (e.source_text && e.source_text.toLowerCase().includes(query))
       );
     }
 
-    return result.sort((a, b) => 
+    return result.sort((a, b) =>
       new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
     );
   }, [entries, search, typeFilter, projectFilter]);
@@ -108,43 +109,86 @@ function LibraryPageContent() {
             const projectName = getProjectName(entry.project_id);
 
             return (
-              <Link key={entry.id} href={`/app/entries/${entry.id}`}>
-                <Card className="h-full hover:border-accent transition-colors cursor-pointer">
-                  <div className="flex items-start justify-between mb-2">
-                    <h3 className="font-semibold text-text-primary truncate">{entry.title}</h3>
-                    <Badge variant={entry.type === 'creature' ? 'accent' : 'default'}>
-                      {entry.type === 'creature' ? 'Creature' : 'Note'}
-                    </Badge>
-                  </div>
-
-                  {entry.type === 'creature' && outputData?.threatTier && (
-                    <div className="mb-2">
-                      <ThreatBadge tier={outputData.threatTier} />
+              <div key={entry.id} className="relative group">
+                <div className="absolute top-3 left-3 z-10 opacity-0 group-hover:opacity-100 focus-within:opacity-100 [&:has(:checked)]:opacity-100 transition-opacity">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(entry.id)}
+                    onChange={(e) => {
+                      const newSet = new Set(selectedIds);
+                      if (e.target.checked) newSet.add(entry.id);
+                      else newSet.delete(entry.id);
+                      setSelectedIds(newSet);
+                    }}
+                    className="w-4 h-4 cursor-pointer rounded border-border text-accent focus:ring-accent"
+                    aria-label={`Select ${entry.title}`}
+                  />
+                </div>
+                <Link href={`/app/entries/${entry.id}`} onClick={(e) => {
+                  // If clicking near checkbox, don't navigate
+                  if ((e.target as HTMLElement).tagName === 'INPUT') {
+                    e.preventDefault();
+                  }
+                }}>
+                  <Card className={`h-full hover:border-accent transition-colors pl-10 cursor-pointer ${selectedIds.has(entry.id) ? 'ring-2 ring-accent border-transparent' : ''}`}>
+                    <div className="flex items-start justify-between mb-2">
+                      <h3 className="font-semibold text-text-primary truncate">{entry.title}</h3>
+                      <Badge variant={entry.type === 'creature' ? 'accent' : 'default'}>
+                        {entry.type === 'creature' ? 'Creature' : 'Note'}
+                      </Badge>
                     </div>
-                  )}
 
-                  {projectName && (
-                    <p className="text-xs text-text-muted mb-2">Project: {projectName}</p>
-                  )}
+                    {entry.type === 'creature' && outputData?.threatTier && (
+                      <div className="mb-2">
+                        <ThreatBadge tier={outputData.threatTier} />
+                      </div>
+                    )}
 
-                  {entry.tags && entry.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mb-2">
-                      {entry.tags.slice(0, 3).map((tag) => (
-                        <Badge key={tag} variant="default">{tag}</Badge>
-                      ))}
-                      {entry.tags.length > 3 && (
-                        <Badge variant="default">+{entry.tags.length - 3}</Badge>
-                      )}
-                    </div>
-                  )}
+                    {projectName && (
+                      <p className="text-xs text-text-muted mb-2">Project: {projectName}</p>
+                    )}
 
-                  <p className="text-xs text-text-muted mt-auto">
-                    Updated {new Date(entry.updated_at).toLocaleDateString()}
-                  </p>
-                </Card>
-              </Link>
+                    {entry.tags && entry.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mb-2">
+                        {entry.tags.slice(0, 3).map((tag) => (
+                          <Badge key={tag} variant="default">{tag}</Badge>
+                        ))}
+                        {entry.tags.length > 3 && (
+                          <Badge variant="default">+{entry.tags.length - 3}</Badge>
+                        )}
+                      </div>
+                    )}
+
+                    <p className="text-xs text-text-muted mt-auto">
+                      Updated {new Date(entry.updated_at).toLocaleDateString()}
+                    </p>
+                  </Card>
+                </Link>
+              </div>
             );
           })}
+        </div>
+      )}
+
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-bg-elevated border border-border rounded-full shadow-lg px-6 py-3 flex items-center gap-4 animate-in slide-in-from-bottom-5">
+          <span className="text-sm font-medium text-text-primary">
+            {selectedIds.size} selected
+          </span>
+          <div className="w-px h-4 bg-border" />
+          <button
+            onClick={() => {
+              const idsParam = Array.from(selectedIds).join(',');
+              window.open(`/app/print?ids=${idsParam}`, '_blank');
+              setSelectedIds(new Set());
+            }}
+            className="text-sm font-medium text-accent hover:text-accent-hover flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+            </svg>
+            Print Selected
+          </button>
         </div>
       )}
     </div>

@@ -8,11 +8,13 @@ import type { Entry } from '@/types';
 
 export default function DashboardPage() {
   const [stats, setStats] = useState({ projects: 0, creatures: 0, notes: 0 });
+  const [loading, setLoading] = useState(true);
   const [recentEntries, setRecentEntries] = useState<Entry[]>([]);
+  const [loadingRecent, setLoadingRecent] = useState(true);
 
   useEffect(() => {
-    getEntriesCount().then(setStats);
-    getRecentEntries(5).then(setRecentEntries);
+    getEntriesCount().then(s => { setStats(s); setLoading(false); });
+    getRecentEntries(5).then(e => { setRecentEntries(e); setLoadingRecent(false); });
   }, []);
 
   return (
@@ -28,7 +30,9 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-text-muted">Projects</p>
-                <p className="text-3xl font-bold text-text-primary">{stats.projects}</p>
+                <p className="text-3xl font-bold text-text-primary">
+                  {loading ? <span className="animate-pulse bg-border text-transparent rounded px-2">00</span> : stats.projects}
+                </p>
               </div>
               <div className="p-3 bg-accent/10 rounded-lg">
                 <svg className="w-6 h-6 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -44,7 +48,9 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-text-muted">Creatures</p>
-                <p className="text-3xl font-bold text-text-primary">{stats.creatures}</p>
+                <p className="text-3xl font-bold text-text-primary">
+                  {loading ? <span className="animate-pulse bg-border text-transparent rounded px-2">00</span> : stats.creatures}
+                </p>
               </div>
               <div className="p-3 bg-accent/10 rounded-lg">
                 <svg className="w-6 h-6 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -80,6 +86,16 @@ export default function DashboardPage() {
           <CardContent>
             <div className="grid grid-cols-2 gap-3">
               <Link
+                href="/app/projects"
+                className="flex flex-col items-center gap-2 p-4 bg-accent rounded-lg hover:bg-accent-hover border border-accent transition-colors group focus:outline-none focus:ring-2 focus:ring-accent"
+              >
+                <svg className="w-8 h-8 text-bg-base/80 group-hover:text-bg-base transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                <span className="text-sm font-medium text-bg-base">New Project</span>
+              </Link>
+
+              <Link
                 href="/app/convert"
                 className="flex flex-col items-center gap-2 p-4 bg-bg-elevated rounded-lg hover:bg-bg-base border border-border transition-colors group focus:outline-none focus:ring-2 focus:ring-accent"
               >
@@ -87,16 +103,6 @@ export default function DashboardPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
                 <span className="text-sm font-medium text-text-primary">Convert Creature</span>
-              </Link>
-
-              <Link
-                href="/app/projects"
-                className="flex flex-col items-center gap-2 p-4 bg-bg-elevated rounded-lg hover:bg-bg-base border border-border transition-colors group focus:outline-none focus:ring-2 focus:ring-accent"
-              >
-                <svg className="w-8 h-8 text-text-muted group-hover:text-accent transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-                <span className="text-sm font-medium text-text-primary">New Project</span>
               </Link>
 
               <Link
@@ -130,7 +136,9 @@ export default function DashboardPage() {
             </Link>
           </div>
           <CardContent>
-            {recentEntries.length === 0 ? (
+            {loadingRecent ? (
+              <div className="py-12 flex justify-center text-text-muted animate-pulse">Loading recent activity...</div>
+            ) : recentEntries.length === 0 ? (
               <p className="text-text-muted text-sm">No entries yet. Start by converting a creature!</p>
             ) : (
               <ul className="divide-y divide-border">

@@ -1,6 +1,7 @@
 'use client';
 
 import { Button, Input, Select } from '@/components/ui';
+import { useState } from 'react';
 import { CreatureCard } from '@/components/features/CreatureCard';
 import { BandValidationPanel } from '@/components/features/BandValidationPanel';
 import { CONVERSION_PROFILES } from '@/lib/conversion/profiles';
@@ -43,12 +44,15 @@ export function Step3Convert({
     ...projects.map((p) => ({ value: p.id, label: p.name })),
   ];
 
+  const [rawTags, setRawTags] = useState(() => tags.join(', '));
+
   const handleTagInput = (value: string) => {
+    setRawTags(value);
     const newTags = value.split(',').map((t) => t.trim()).filter(Boolean);
     onTagsChange(newTags);
   };
 
-  const profile   = CONVERSION_PROFILES[settings.conversionProfileId];
+  const profile = CONVERSION_PROFILES[settings.conversionProfileId];
   const bandReport = profile
     ? validateBands(outputData, profile)
     : null;
@@ -60,7 +64,7 @@ export function Step3Convert({
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h2 className="text-lg font-semibold text-text-primary mb-1">Step 3: Adjust & Save</h2>
+          <h2 className="text-lg font-semibold text-text-primary mb-1">Step 2: Adjust & Save</h2>
           <p className="text-sm text-text-muted">Fine-tune the converted stats and save to your library.</p>
         </div>
         <div className="flex items-center gap-2 text-xs shrink-0 flex-wrap">
@@ -77,7 +81,13 @@ export function Step3Convert({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* ── Left column: controls ── */}
+        {/* ── Left column: preview ── */}
+        <div>
+          <h3 className="font-semibold text-text-primary mb-4">Converted Creature</h3>
+          <CreatureCard data={outputData} />
+        </div>
+
+        {/* ── Right column: controls ── */}
         <div className="space-y-5">
           {/* Sliders */}
           <details className="group border border-border rounded-lg overflow-hidden">
@@ -184,7 +194,7 @@ export function Step3Convert({
             <div>
               <Input
                 label="Tags"
-                value={tags.join(', ')}
+                value={rawTags}
                 onChange={(e) => handleTagInput(e.target.value)}
                 placeholder="undead, boss, cave"
                 hint="Comma-separated"
@@ -204,12 +214,6 @@ export function Step3Convert({
               onSettingsChange={onSettingsChange}
             />
           )}
-        </div>
-
-        {/* ── Right column: preview ── */}
-        <div>
-          <h3 className="font-semibold text-text-primary mb-4">Preview</h3>
-          <CreatureCard data={outputData} />
         </div>
       </div>
 

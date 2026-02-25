@@ -85,18 +85,21 @@ export default function EntryDetailPage() {
             <h2 className="text-lg font-semibold text-text-primary mb-4">Converted Stat Block</h2>
             <CreatureCard data={outputData} />
           </div>
-          
+
           <div className="space-y-6">
-            <div>
-              <h2 className="text-lg font-semibold text-text-primary mb-4">Source Text</h2>
-              <Card>
-                <CardContent>
-                  <pre className="text-sm text-text-muted whitespace-pre-wrap font-mono">
-                    {entry.source_text || 'No source text'}
-                  </pre>
-                </CardContent>
-              </Card>
-            </div>
+            <details className="group border border-border rounded-lg overflow-hidden bg-bg-elevated">
+              <summary className="flex items-center justify-between px-4 py-3 text-sm font-semibold text-text-primary cursor-pointer hover:bg-bg-base select-none list-none focus:outline-none focus-visible:ring-2 focus-visible:ring-accent">
+                <span>View Source Text</span>
+                <svg className="w-4 h-4 transition-transform group-open:rotate-180 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </summary>
+              <div className="px-4 pb-4 pt-2 border-t border-border">
+                <pre className="text-sm text-text-muted whitespace-pre-wrap font-mono">
+                  {entry.source_text || 'No source text'}
+                </pre>
+              </div>
+            </details>
           </div>
         </div>
       ) : entry.type === 'adventure_note' ? (
@@ -124,7 +127,7 @@ export default function EntryDetailPage() {
       )}
 
       <div className="text-xs text-text-muted">
-        Created {new Date(entry.created_at).toLocaleString()} · 
+        Created {new Date(entry.created_at).toLocaleString()} ·
         Updated {new Date(entry.updated_at).toLocaleString()}
       </div>
     </div>

@@ -1,13 +1,12 @@
 'use client';
 
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Stepper, Card } from '@/components/ui';
-import { parseStatBlock, createEmptyParsedData } from '@/lib/parser';
+import { parseStatBlock } from '@/lib/parser';
 import { convertCreature, getDefaultSettings } from '@/lib/conversion/engine';
 import { getProjects as getLocalProjects, saveEntry, updateEntry } from '@/lib/storage';
 import { Step1Source } from './steps/Step1Source';
-import { Step2Parse } from './steps/Step2Parse';
 import { Step3Convert } from './steps/Step3Convert';
 import { Step4Export } from './steps/Step4Export';
 import type {
@@ -23,7 +22,7 @@ import type { ConversionProfileId } from '@/lib/conversion/profiles';
 
 // Map ConversionProfileId → legacy outputProfile for backward compat
 const PROFILE_TO_OUTPUT: Record<ConversionProfileId, string> = {
-  osr_generic_v1:           'osr_generic',
+  osr_generic_v1: 'osr_generic',
   shadowdark_compatible_v1: 'shadowdark_compatible',
 };
 
@@ -35,9 +34,8 @@ interface ConversionWizardProps {
 
 const STEPS = [
   { id: 1, label: 'Source' },
-  { id: 2, label: 'Parse' },
-  { id: 3, label: 'Convert' },
-  { id: 4, label: 'Export' },
+  { id: 2, label: 'Convert' },
+  { id: 3, label: 'Export' },
 ];
 
 // Persist last-used profile + role in localStorage
@@ -75,7 +73,7 @@ export function ConversionWizard({
   // ── Initial state ────────────────────────────────────────────────────────
   const initialSettings = (): ConversionSettings => {
     const prefs = loadPrefs();
-    const base  = getDefaultSettings();
+    const base = getDefaultSettings();
     if (existingEntry?.output_json?.tuning) {
       const t = existingEntry.output_json.tuning;
       return {
@@ -108,22 +106,24 @@ export function ConversionWizard({
     validationReport: undefined,
   }));
 
-  const [projectId,     setProjectId]     = useState(defaultProjectId ?? '');
-  const [title,         setTitle]         = useState(existingEntry?.title ?? '');
-  const [tags,          setTags]          = useState<string[]>(existingEntry?.tags ?? []);
-  const [saving,        setSaving]        = useState(false);
-  const [parseWarnings, setParseWarnings] = useState<string[]>([]);
+  const [projectId, setProjectId] = useState(defaultProjectId ?? '');
+  const [title, setTitle] = useState(existingEntry?.title ?? '');
+  const [tags, setTags] = useState<string[]>(existingEntry?.tags ?? []);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     getLocalProjects().then(lp => {
       if (lp.length > 0) {
-        setProjects([...serverProjects, ...lp.map(p => ({ id: p.id, name: p.name }))]);
+        setProjects(prev => {
+          const all = [...prev, ...lp.map(p => ({ id: p.id, name: p.name }))];
+          return Array.from(new Map(all.map(p => [p.id, p])).values());
+        });
       }
     });
-  }, [serverProjects]);
+  }, []);
 
   // ── Navigation ────────────────────────────────────────────────────────────
-  const goToStep = useCallback((step: 1 | 2 | 3 | 4) => {
+  const goToStep = useCallback((step: 1 | 2 | 3) => {
     setState(prev => ({ ...prev, step }));
   }, []);
 
@@ -177,24 +177,14 @@ export function ConversionWizard({
     });
   }, []);
 
-  // ── Parse ─────────────────────────────────────────────────────────────────
-  const handleParse = useCallback(() => {
+  // ── Parse & Convert ───────────────────────────────────────────────────────
+  const handleParseAndConvert = useCallback(() => {
     const result = parseStatBlock(state.sourceText, state.sourceSystem);
-    setParseWarnings(result.warnings);
-    setState(prev => ({ ...prev, parsedData: result.data, step: 2 }));
-    if (!title && result.data.name) setTitle(result.data.name);
-  }, [state.sourceText, state.sourceSystem, title]);
-
-  const handleParsedDataChange = useCallback((data: ParsedCreatureData) =>
-    setState(prev => ({ ...prev, parsedData: data })), []);
-
-  // ── Convert ───────────────────────────────────────────────────────────────
-  const handleConvert = useCallback(() => {
-    if (!state.parsedData) return;
-    const output = runConvert(state.parsedData, state.settings, state.metadata.intendedLevel, state.metadata.role as CreatureRole);
-    setState(prev => ({ ...prev, outputData: output, step: 3 }));
-    if (!title && output.name) setTitle(output.name);
-  }, [state.parsedData, state.settings, state.metadata, title]);
+    // Parse warnings tracked here previously could be piped to Step 3 if needed
+    const output = runConvert(result.data, state.settings, state.metadata.intendedLevel, state.metadata.role as CreatureRole);
+    setState(prev => ({ ...prev, parsedData: result.data, outputData: output, step: 2 }));
+    if (!title && (output.name || result.data.name)) setTitle(output.name || result.data.name || '');
+  }, [state.sourceText, state.sourceSystem, state.settings, state.metadata, title]);
 
   // ── Settings change (sliders) ─────────────────────────────────────────────
   const handleSettingsChange = useCallback((settings: ConversionSettings) => {
@@ -224,23 +214,13 @@ export function ConversionWizard({
       } else {
         await saveEntry(entryData);
       }
-      setState(prev => ({ ...prev, step: 4 }));
+      setState(prev => ({ ...prev, step: 3 }));
     } catch (err) {
       console.error('Failed to save entry:', err);
     }
     setSaving(false);
   }, [state.outputData, state.sourceText, state.parsedData, projectId, title, tags, existingEntry]);
 
-  // ── Live Step 1 preview ───────────────────────────────────────────────────
-  const step1Preview = useMemo((): OutputCreatureData | null => {
-    if (state.sourceText.trim().length <= 10) return null;
-    try {
-      const { data } = parseStatBlock(state.sourceText, state.sourceSystem);
-      return runConvert(data, state.settings, state.metadata.intendedLevel, state.metadata.role as CreatureRole);
-    } catch {
-      return null;
-    }
-  }, [state.sourceText, state.sourceSystem, state.settings, state.metadata]);
 
   const resetWizard = useCallback(() => {
     setState({
@@ -273,7 +253,7 @@ export function ConversionWizard({
         <Stepper
           steps={STEPS}
           currentStep={state.step}
-          onStepClick={(step) => { if (step < state.step) goToStep(step as 1 | 2 | 3 | 4); }}
+          onStepClick={(step) => { if (step < state.step) goToStep(step as 1 | 2 | 3); }}
         />
       </div>
 
@@ -284,26 +264,15 @@ export function ConversionWizard({
             sourceSystem={state.sourceSystem}
             conversionProfileId={state.settings.conversionProfileId}
             metadata={state.metadata}
-            previewData={step1Preview}
             onSourceChange={handleSourceChange}
             onSystemChange={handleSystemChange}
             onProfileChange={handleProfileChange}
             onMetadataChange={handleMetadataChange}
-            onNext={handleParse}
+            onNext={handleParseAndConvert}
           />
         )}
 
-        {state.step === 2 && (
-          <Step2Parse
-            parsedData={state.parsedData || createEmptyParsedData()}
-            warnings={parseWarnings}
-            onDataChange={handleParsedDataChange}
-            onBack={() => goToStep(1)}
-            onNext={handleConvert}
-          />
-        )}
-
-        {state.step === 3 && state.outputData && (
+        {state.step === 2 && state.outputData && (
           <Step3Convert
             outputData={state.outputData}
             settings={state.settings}
@@ -315,13 +284,13 @@ export function ConversionWizard({
             onProjectChange={setProjectId}
             onTitleChange={setTitle}
             onTagsChange={setTags}
-            onBack={() => goToStep(2)}
+            onBack={() => goToStep(1)}
             onSave={handleSave}
             saving={saving}
           />
         )}
 
-        {state.step === 4 && state.outputData && (
+        {state.step === 3 && state.outputData && (
           <Step4Export
             outputData={state.outputData}
             title={title}

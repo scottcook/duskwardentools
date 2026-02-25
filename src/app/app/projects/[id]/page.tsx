@@ -2,9 +2,10 @@
 
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Badge, Card, CardContent } from '@/components/ui';
 import { ProjectActions } from './ProjectActions';
+import { LibrarySelectModal } from './LibrarySelectModal';
 import { getProject, getEntries } from '@/lib/storage';
 import type { Project, Entry } from '@/types';
 
@@ -14,6 +15,15 @@ export default function ProjectDetailPage() {
   const [project, setProject] = useState<Project | null>(null);
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const refreshEntries = useCallback(async () => {
+    const allEntries = await getEntries();
+    const projectEntries = allEntries
+      .filter((e: Entry) => e.project_id === params.id)
+      .sort((a: Entry, b: Entry) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+    setEntries(projectEntries);
+  }, [params.id]);
 
   useEffect(() => {
     const id = params.id as string;
@@ -24,14 +34,10 @@ export default function ProjectDetailPage() {
         return;
       }
       setProject(foundProject);
-      const allEntries = await getEntries();
-      const projectEntries = allEntries
-        .filter((e: Entry) => e.project_id === id)
-        .sort((a: Entry, b: Entry) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
-      setEntries(projectEntries);
+      refreshEntries();
       setLoading(false);
     })();
-  }, [params.id, router]);
+  }, [params.id, router, refreshEntries]);
 
   if (loading || !project) {
     return (
@@ -92,12 +98,20 @@ export default function ProjectDetailPage() {
 
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-text-primary">Entries</h2>
-        <Link
-          href={`/app/convert?project=${project.id}`}
-          className="text-sm text-accent hover:text-accent-hover transition-colors"
-        >
-          Add creature
-        </Link>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="text-sm font-medium text-accent hover:text-accent-hover transition-colors"
+          >
+            Add from Library
+          </button>
+          <Link
+            href={`/app/convert?project=${project.id}`}
+            className="text-sm font-medium text-accent hover:text-accent-hover transition-colors"
+          >
+            Add new creature
+          </Link>
+        </div>
       </div>
 
       {entries.length === 0 ? (
@@ -143,6 +157,13 @@ export default function ProjectDetailPage() {
           ))}
         </div>
       )}
+
+      <LibrarySelectModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        projectId={project.id}
+        onAdded={refreshEntries}
+      />
     </div>
   );
 }
