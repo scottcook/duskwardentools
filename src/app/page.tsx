@@ -24,10 +24,10 @@ export default function LandingPage() {
       <main className="flex-1 flex items-center justify-center px-4">
         <div className="max-w-2xl text-center">
           <h2 className="text-4xl sm:text-5xl font-bold text-text-primary mb-6 text-center max-w-3xl mx-auto text-balance leading-tight">
-            Duskwarden | 5e to OSR Monster Converter
+            Duskwarden | 5e/OSE to OSR Monster Converter
           </h2>
           <p className="text-lg text-text-muted mb-8 text-center max-w-2xl mx-auto text-balance">
-            Turn 5e prep into OSR play. Paste any modern monster and get a streamlined, table-ready stat card in seconds.
+            Paste any 5e or OSE monster and get a streamlined, table-ready stat card in seconds.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link
