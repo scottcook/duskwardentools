@@ -15,8 +15,8 @@ const unifrakturCook = UnifrakturCook({
 });
 
 export const metadata: Metadata = {
-  title: "Duskwarden Tools",
-  description: "A conversion workbench for tabletop RPG creatures and adventure notes",
+  title: "Duskwarden | 5e to OSR Monster Converter",
+  description: "Turn 5e prep into OSR play. Paste any modern monster and get a streamlined, table-ready stat card in seconds.",
 };
 
 export default function RootLayout({
