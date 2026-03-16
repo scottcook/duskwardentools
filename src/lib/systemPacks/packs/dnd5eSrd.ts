@@ -9,7 +9,8 @@
  */
 
 import { parseStatBlock } from '@/lib/parser';
-import type { ParsedCreatureData, Attack } from '@/types';
+import { convertCreature } from '@/lib/conversion/engine';
+import type { ParsedCreatureData, Attack, ConversionSettings, CreatureRole, ThreatTier, SourceSystem } from '@/types';
 import type {
   SystemPack,
   ConvertOptions,
@@ -17,7 +18,7 @@ import type {
   ReferenceStatblock,
   ValidationReport,
 } from '../types';
-import { buildConvertedStat, buildProvenance } from '../conversionUtils';
+import { buildProvenance } from '../conversionUtils';
 import { generateValidationReport } from '../validateUtils';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -77,7 +78,7 @@ function srdMonsterToParsed(m: SrdMonster): ParsedCreatureData {
 export const dnd5eSrdPack: SystemPack = {
   id: 'dnd5e_srd',
   displayName: 'D&D 5e (SRD)',
-  description: 'Uses SRD 5.1 monster data (CC BY 4.0) for accurate stat lookup and conversion.',
+  description: 'Uses SRD 5.1 monster data (CC BY 4.0) for licensed lookup, enrichment, and reference comparison.',
   license: {
     type: 'CC-BY-4.0',
     attributionText: CC_BY_ATTRIBUTION,
@@ -86,8 +87,8 @@ export const dnd5eSrdPack: SystemPack = {
   canAutoFindStatblocks: true,
   requiresUserReference: false,
 
-  parseSourceStatblock(inputText: string): ParsedCreatureData {
-    const result = parseStatBlock(inputText);
+  parseSourceStatblock(inputText: string, systemHint?: SourceSystem): ParsedCreatureData {
+    const result = parseStatBlock(inputText, systemHint ?? '5e');
     const parsed  = result.data;
 
     // Enrich with SRD canonical data when we recognise the creature name
@@ -116,15 +117,22 @@ export const dnd5eSrdPack: SystemPack = {
       'CC-BY-4.0',
       CC_BY_ATTRIBUTION
     );
-    return buildConvertedStat(
-      parsed, options,
-      /* hpMultiplier */  1.0,
-      /* dmgMultiplier */ 1.0,
-      /* showMorale */    true,
-      /* showReaction */  false,
-      'dnd5e_srd',
-      provenance
-    );
+    const settings: ConversionSettings = {
+      deadliness: options.deadliness,
+      durability: options.durability,
+      targetLevel: options.targetLevel,
+      targetTier: options.targetTier as ThreatTier | undefined,
+      role: options.role as CreatureRole | undefined,
+      outputProfile: 'osr_generic',
+      outputPackId: 'dnd5e_srd',
+      conversionProfileId: 'osr_generic_v1',
+    };
+    const converted = convertCreature(parsed, settings);
+    return {
+      ...converted,
+      outputPackId: 'dnd5e_srd',
+      provenance,
+    };
   },
 
   validate(converted: ConvertedStat, reference?: ReferenceStatblock): ValidationReport {

@@ -27,7 +27,7 @@ export default function LandingPage() {
             Duskwarden | 5e/OSE to OSR Monster Converter
           </h2>
           <p className="text-lg text-text-muted mb-8 text-center max-w-2xl mx-auto text-balance">
-            Paste any 5e or OSE monster and get a streamlined, table-ready stat card in seconds.
+            Paste 5e, OSE, B/X, or generic stat blocks and generate a streamlined compatibility stat card in seconds.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link
@@ -46,7 +46,7 @@ export default function LandingPage() {
                 </svg>
               </div>
               <h3 className="text-lg font-semibold text-text-primary mb-2">Quick Conversion</h3>
-              <p className="text-sm text-text-muted">Paste any stat block and convert it with adjustable difficulty sliders.</p>
+              <p className="text-sm text-text-muted">Convert supported stat blocks quickly, then tune the result with adjustable difficulty sliders.</p>
             </div>
 
             <div className="p-6 bg-bg-surface border border-border rounded-lg">
@@ -76,6 +76,9 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <p className="text-center text-xs text-text-muted">
             Duskwarden Tools is an independent product and is not affiliated with The Arcane Library, LLC.
+          </p>
+          <p className="mt-1 text-center text-xs text-text-muted">
+            Conversion output uses Duskwarden compatibility heuristics and should be reviewed before publication or play.
           </p>
         </div>
       </footer>

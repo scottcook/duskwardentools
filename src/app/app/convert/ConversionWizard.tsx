@@ -3,9 +3,12 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Stepper, Card } from '@/components/ui';
+import { getDefaultSettings } from '@/lib/conversion/engine';
+import { detectSourceSystem } from '@/lib/parser/detectSourceSystem';
 import { parseStatBlock } from '@/lib/parser';
-import { convertCreature, getDefaultSettings } from '@/lib/conversion/engine';
 import { getProjects as getLocalProjects, saveEntry, updateEntry } from '@/lib/storage';
+import { SYSTEM_PACKS } from '@/lib/systemPacks';
+import { getOutputPackId, getParserPackId } from '@/lib/systemPacks/runtime';
 import { Step1Source } from './steps/Step1Source';
 import { Step3Convert } from './steps/Step3Convert';
 import { Step4Export } from './steps/Step4Export';
@@ -19,12 +22,102 @@ import type {
   OutputCreatureData,
 } from '@/types';
 import type { ConversionProfileId } from '@/lib/conversion/profiles';
+import type { ConvertOptions, ReferenceStatblock } from '@/lib/systemPacks/types';
 
 // Map ConversionProfileId → legacy outputProfile for backward compat
 const PROFILE_TO_OUTPUT: Record<ConversionProfileId, string> = {
   osr_generic_v1: 'osr_generic',
   shadowdark_compatible_v1: 'shadowdark_compatible',
 };
+
+function applyProfileSettings(
+  sourceSystem: SourceSystem,
+  settings: ConversionSettings,
+  conversionProfileId: ConversionProfileId,
+): ConversionSettings {
+  return {
+    ...settings,
+    conversionProfileId,
+    outputProfile: PROFILE_TO_OUTPUT[conversionProfileId] as ConversionSettings['outputProfile'],
+    outputPackId: getOutputPackId(sourceSystem, conversionProfileId),
+  };
+}
+
+function buildConvertOptions(
+  settings: ConversionSettings,
+  intendedTier?: number,
+  role?: CreatureRole,
+): ConvertOptions {
+  return {
+    deadliness: settings.deadliness,
+    durability: settings.durability,
+    targetLevel: settings.targetLevel,
+    targetTier: intendedTier as ConvertOptions['targetTier'],
+    role: role ?? settings.role,
+  };
+}
+
+function buildValidationReference(
+  outputPackId: ConversionSettings['outputPackId'],
+  parsed: ParsedCreatureData,
+  referenceText?: string,
+): ReferenceStatblock | undefined {
+  if (referenceText?.trim()) {
+    return {
+      rawText: referenceText,
+      parsed: {},
+    };
+  }
+
+  if (outputPackId !== 'dnd5e_srd') return undefined;
+
+  const pack = SYSTEM_PACKS.dnd5e_srd;
+  const lookupName = parsed.name?.trim();
+  if (!lookupName) return undefined;
+
+  const srdRef = pack.findStatblockByName?.(lookupName);
+  if (!srdRef) return undefined;
+
+  return {
+    rawText: '',
+    parsed: {
+      name: srdRef.name,
+      ac: srdRef.ac,
+      hp: srdRef.hp,
+      movement: srdRef.movement,
+      attacks: srdRef.attacks ?? [],
+      saves: srdRef.saves,
+    },
+  };
+}
+
+function runPackPipeline(
+  parsed: ParsedCreatureData,
+  sourceSystem: SourceSystem,
+  settings: ConversionSettings,
+  intendedTier?: number,
+  role?: CreatureRole,
+  nameOverride?: string,
+  referenceText?: string,
+): { outputData: OutputCreatureData; validationReport: WizardState['validationReport'] } {
+  const outputPackId = getOutputPackId(sourceSystem, settings.conversionProfileId);
+  const pack = SYSTEM_PACKS[outputPackId];
+  const output = pack.convertToTarget(parsed, buildConvertOptions(settings, intendedTier, role));
+
+  if (nameOverride?.trim()) {
+    output.name = nameOverride.trim();
+  }
+
+  output.outputPackId = outputPackId;
+
+  const reference = buildValidationReference(outputPackId, parsed, referenceText);
+  const validationReport = pack.validate(output, reference);
+
+  return {
+    outputData: output as OutputCreatureData,
+    validationReport,
+  };
+}
 
 interface ConversionWizardProps {
   projects: { id: string; name: string }[];
@@ -49,19 +142,6 @@ function savePrefs(p: { profileId: ConversionProfileId; role?: CreatureRole }) {
   localStorage.setItem(LS_PREFS, JSON.stringify(p));
 }
 
-function runConvert(
-  parsed: ParsedCreatureData,
-  settings: ConversionSettings,
-  intendedLevel?: number,
-  role?: CreatureRole
-): OutputCreatureData {
-  return convertCreature(parsed, {
-    ...settings,
-    targetLevel: intendedLevel ?? parsed.level,
-    role: role ?? settings.role,
-  });
-}
-
 export function ConversionWizard({
   projects: serverProjects,
   defaultProjectId,
@@ -74,27 +154,34 @@ export function ConversionWizard({
   const initialSettings = (): ConversionSettings => {
     const prefs = loadPrefs();
     const base = getDefaultSettings();
+    const sourceSystem = (existingEntry?.parsed_json as ParsedCreatureData | null)?.system ?? '5e';
     if (existingEntry?.output_json?.tuning) {
       const t = existingEntry.output_json.tuning;
-      return {
+      return applyProfileSettings(sourceSystem, {
         ...base,
         conversionProfileId: t.profileId,
         role: t.role as CreatureRole,
         durability: t.hpMultiplier,
         deadliness: t.damageMultiplier,
-      };
+        outputPackId: existingEntry.output_json.outputPackId,
+        outputProfile: existingEntry.output_json.outputProfile,
+      }, t.profileId);
     }
-    return {
+    return applyProfileSettings(sourceSystem, {
       ...base,
       conversionProfileId: prefs.profileId ?? 'osr_generic_v1',
       role: prefs.role,
-    };
+    }, prefs.profileId ?? 'osr_generic_v1');
   };
 
   const [state, setState] = useState<WizardState>(() => ({
     step: 1,
     sourceText: existingEntry?.source_text ?? '',
     sourceSystem: (existingEntry?.parsed_json as ParsedCreatureData)?.system ?? '5e',
+    detectedSourceSystem: undefined,
+    detectedSourceSystemConfidence: undefined,
+    hasManualSourceSystemSelection: Boolean(existingEntry),
+    creatureName: existingEntry?.output_json?.name ?? existingEntry?.title ?? '',
     metadata: {
       intendedLevel: (existingEntry?.parsed_json as ParsedCreatureData)?.level,
       role: undefined,
@@ -104,6 +191,7 @@ export function ConversionWizard({
     outputData: null,
     referenceStatblock: '',
     validationReport: undefined,
+    isStatblockValid: existingEntry ? true : undefined,
   }));
 
   const [projectId, setProjectId] = useState(defaultProjectId ?? '');
@@ -122,6 +210,62 @@ export function ConversionWizard({
     });
   }, []);
 
+  useEffect(() => {
+    if (state.step !== 1) return;
+
+    const timeout = window.setTimeout(() => {
+      if (state.sourceText.trim().length < 10) {
+        setState(prev => {
+          if (!prev.detectedSourceSystem && !prev.detectedSourceSystemConfidence && prev.isStatblockValid === undefined) return prev;
+          return {
+            ...prev,
+            detectedSourceSystem: undefined,
+            detectedSourceSystemConfidence: undefined,
+            isStatblockValid: undefined,
+          };
+        });
+        return;
+      }
+
+      const detection = detectSourceSystem(state.sourceText);
+      const parseResult = parseStatBlock(state.sourceText, detection?.system);
+
+      setState(prev => {
+        if (prev.step !== 1 || prev.sourceText !== state.sourceText) return prev;
+
+        const nextState: WizardState = {
+          ...prev,
+          detectedSourceSystem: detection?.system,
+          detectedSourceSystemConfidence: detection?.confidence,
+          isStatblockValid: parseResult.success,
+        };
+
+        const shouldAutoApply = Boolean(
+          detection &&
+          detection.system !== 'other' &&
+          detection.confidence !== 'low' &&
+          !prev.hasManualSourceSystemSelection
+        );
+
+        if (!shouldAutoApply || prev.sourceSystem === detection?.system) {
+          return nextState;
+        }
+
+        if (!detection) {
+          return nextState;
+        }
+
+        return {
+          ...nextState,
+          sourceSystem: detection.system,
+          settings: applyProfileSettings(detection.system, prev.settings, prev.settings.conversionProfileId),
+        };
+      });
+    }, state.sourceText.trim().length < 10 ? 0 : 250);
+
+    return () => window.clearTimeout(timeout);
+  }, [state.sourceText, state.step]);
+
   // ── Navigation ────────────────────────────────────────────────────────────
   const goToStep = useCallback((step: 1 | 2 | 3) => {
     setState(prev => ({ ...prev, step }));
@@ -130,29 +274,81 @@ export function ConversionWizard({
   // ── Profile change ────────────────────────────────────────────────────────
   const handleProfileChange = useCallback((conversionProfileId: ConversionProfileId) => {
     setState(prev => {
-      const newSettings: ConversionSettings = {
-        ...prev.settings,
-        conversionProfileId,
-        outputProfile: PROFILE_TO_OUTPUT[conversionProfileId] as ConversionSettings['outputProfile'],
-      };
+      const newSettings = applyProfileSettings(prev.sourceSystem, prev.settings, conversionProfileId);
       savePrefs({ profileId: conversionProfileId, role: prev.metadata.role as CreatureRole });
       if (prev.parsedData && prev.outputData) {
+        const { outputData, validationReport } = runPackPipeline(
+          prev.parsedData,
+          prev.sourceSystem,
+          newSettings,
+          prev.metadata.intendedLevel,
+          prev.metadata.role as CreatureRole,
+          prev.creatureName || undefined,
+          prev.referenceStatblock,
+        );
         return {
           ...prev,
           settings: newSettings,
-          outputData: runConvert(prev.parsedData, newSettings, prev.metadata.intendedLevel, prev.metadata.role as CreatureRole),
+          outputData,
+          validationReport,
         };
       }
       return { ...prev, settings: newSettings };
     });
   }, []);
 
-  // ── Source / system ───────────────────────────────────────────────────────
+  // ── Source / system / name ────────────────────────────────────────────────
   const handleSourceChange = useCallback((sourceText: string) =>
     setState(prev => ({ ...prev, sourceText })), []);
 
-  const handleSystemChange = useCallback((sourceSystem: SourceSystem) =>
-    setState(prev => ({ ...prev, sourceSystem })), []);
+  const handleSystemChange = useCallback((sourceSystem: SourceSystem) => {
+    setState(prev => {
+      const newSettings = applyProfileSettings(sourceSystem, prev.settings, prev.settings.conversionProfileId);
+      if (prev.parsedData && prev.outputData) {
+        const { outputData, validationReport } = runPackPipeline(
+          prev.parsedData,
+          sourceSystem,
+          newSettings,
+          prev.metadata.intendedLevel,
+          prev.metadata.role as CreatureRole,
+          prev.creatureName || undefined,
+          prev.referenceStatblock,
+        );
+        return {
+          ...prev,
+          sourceSystem,
+          hasManualSourceSystemSelection: true,
+          settings: newSettings,
+          outputData,
+          validationReport,
+        };
+      }
+      return { ...prev, sourceSystem, hasManualSourceSystemSelection: true, settings: newSettings };
+    });
+  }, []);
+
+  const handleCreatureNameChange = useCallback((creatureName: string) => {
+    setState(prev => {
+      if (prev.parsedData && prev.outputData) {
+        const { outputData, validationReport } = runPackPipeline(
+          prev.parsedData,
+          prev.sourceSystem,
+          prev.settings,
+          prev.metadata.intendedLevel,
+          prev.metadata.role as CreatureRole,
+          creatureName || undefined,
+          prev.referenceStatblock,
+        );
+        return {
+          ...prev,
+          creatureName,
+          outputData,
+          validationReport,
+        };
+      }
+      return { ...prev, creatureName };
+    });
+  }, []);
 
   const handleMetadataChange = useCallback((
     key: 'intendedLevel' | 'role',
@@ -162,36 +358,101 @@ export function ConversionWizard({
       const newMeta = { ...prev.metadata, [key]: value };
       if (key === 'role' && value) savePrefs({ profileId: prev.settings.conversionProfileId, role: value as CreatureRole });
       if (prev.parsedData && prev.outputData) {
+        const { outputData, validationReport } = runPackPipeline(
+          prev.parsedData,
+          prev.sourceSystem,
+          prev.settings,
+          key === 'intendedLevel' ? (value as number) : prev.metadata.intendedLevel,
+          key === 'role' ? (value as CreatureRole) : prev.metadata.role as CreatureRole,
+          prev.creatureName || undefined,
+          prev.referenceStatblock,
+        );
         return {
           ...prev,
           metadata: newMeta,
-          outputData: runConvert(
-            prev.parsedData,
-            prev.settings,
-            key === 'intendedLevel' ? (value as number) : prev.metadata.intendedLevel,
-            key === 'role' ? (value as CreatureRole) : prev.metadata.role as CreatureRole
-          ),
+          outputData,
+          validationReport,
         };
       }
       return { ...prev, metadata: newMeta };
     });
   }, []);
 
+  const handleReferenceStatblockChange = useCallback((referenceStatblock: string) => {
+    setState(prev => {
+      if (prev.parsedData && prev.outputData) {
+        const { outputData, validationReport } = runPackPipeline(
+          prev.parsedData,
+          prev.sourceSystem,
+          prev.settings,
+          prev.metadata.intendedLevel,
+          prev.metadata.role as CreatureRole,
+          prev.creatureName || undefined,
+          referenceStatblock,
+        );
+        return {
+          ...prev,
+          referenceStatblock,
+          outputData,
+          validationReport,
+        };
+      }
+
+      return { ...prev, referenceStatblock };
+    });
+  }, []);
+
   // ── Parse & Convert ───────────────────────────────────────────────────────
   const handleParseAndConvert = useCallback(() => {
-    const result = parseStatBlock(state.sourceText, state.sourceSystem);
-    // Parse warnings tracked here previously could be piped to Step 3 if needed
-    const output = runConvert(result.data, state.settings, state.metadata.intendedLevel, state.metadata.role as CreatureRole);
-    setState(prev => ({ ...prev, parsedData: result.data, outputData: output, step: 2 }));
-    if (!title && (output.name || result.data.name)) setTitle(output.name || result.data.name || '');
-  }, [state.sourceText, state.sourceSystem, state.settings, state.metadata, title]);
+    const parserPack = SYSTEM_PACKS[getParserPackId(state.sourceSystem)];
+    const parsed = parserPack.parseSourceStatblock(state.sourceText, state.sourceSystem);
+    const { outputData, validationReport } = runPackPipeline(
+      parsed,
+      state.sourceSystem,
+      state.settings,
+      state.metadata.intendedLevel,
+      state.metadata.role as CreatureRole,
+      state.creatureName || undefined,
+      state.referenceStatblock,
+    );
+    setState(prev => ({
+      ...prev,
+      parsedData: parsed,
+      settings: {
+        ...prev.settings,
+        outputPackId: outputData.outputPackId,
+      },
+      outputData,
+      validationReport,
+      step: 2,
+    }));
+    const effectiveName = state.creatureName || outputData.name || parsed.name || '';
+    if (!title) setTitle(effectiveName);
+  }, [state.sourceText, state.sourceSystem, state.settings, state.metadata, state.creatureName, state.referenceStatblock, title]);
 
   // ── Settings change (sliders) ─────────────────────────────────────────────
   const handleSettingsChange = useCallback((settings: ConversionSettings) => {
     setState(prev => {
       if (!prev.parsedData) return prev;
-      const output = runConvert(prev.parsedData, settings, prev.metadata.intendedLevel, prev.metadata.role as CreatureRole);
-      return { ...prev, settings, outputData: output };
+      const normalizedSettings = {
+        ...settings,
+        outputPackId: getOutputPackId(prev.sourceSystem, settings.conversionProfileId),
+      };
+      const { outputData, validationReport } = runPackPipeline(
+        prev.parsedData,
+        prev.sourceSystem,
+        normalizedSettings,
+        prev.metadata.intendedLevel,
+        prev.metadata.role as CreatureRole,
+        prev.creatureName || undefined,
+        prev.referenceStatblock,
+      );
+      return {
+        ...prev,
+        settings: normalizedSettings,
+        outputData,
+        validationReport,
+      };
     });
   }, []);
 
@@ -227,12 +488,17 @@ export function ConversionWizard({
       step: 1,
       sourceText: '',
       sourceSystem: '5e',
+      detectedSourceSystem: undefined,
+      detectedSourceSystemConfidence: undefined,
+      hasManualSourceSystemSelection: false,
+      creatureName: '',
       metadata: {},
       parsedData: null,
-      settings: getDefaultSettings(),
+      settings: applyProfileSettings('5e', getDefaultSettings(), getDefaultSettings().conversionProfileId),
       outputData: null,
       referenceStatblock: '',
       validationReport: undefined,
+      isStatblockValid: undefined,
     });
     setTitle('');
     setTags([]);
@@ -262,11 +528,17 @@ export function ConversionWizard({
           <Step1Source
             sourceText={state.sourceText}
             sourceSystem={state.sourceSystem}
+            detectedSourceSystem={state.detectedSourceSystem}
+            detectedSourceSystemConfidence={state.detectedSourceSystemConfidence}
+            hasManualSourceSystemSelection={state.hasManualSourceSystemSelection}
             conversionProfileId={state.settings.conversionProfileId}
+            creatureName={state.creatureName}
             metadata={state.metadata}
+            isValid={state.isStatblockValid}
             onSourceChange={handleSourceChange}
             onSystemChange={handleSystemChange}
             onProfileChange={handleProfileChange}
+            onCreatureNameChange={handleCreatureNameChange}
             onMetadataChange={handleMetadataChange}
             onNext={handleParseAndConvert}
           />
@@ -280,10 +552,14 @@ export function ConversionWizard({
             projectId={projectId}
             title={title}
             tags={tags}
+            validationReport={state.validationReport}
+            referenceStatblock={state.referenceStatblock ?? ''}
+            outputPackId={state.outputData.outputPackId}
             onSettingsChange={handleSettingsChange}
             onProjectChange={setProjectId}
             onTitleChange={setTitle}
             onTagsChange={setTags}
+            onReferenceStatblockChange={handleReferenceStatblockChange}
             onBack={() => goToStep(1)}
             onSave={handleSave}
             saving={saving}

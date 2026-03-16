@@ -1,10 +1,15 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
+import { getPublicSupabaseEnv } from '@/lib/env';
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get('code');
   const next = searchParams.get('next') ?? '/app';
+
+  if (!getPublicSupabaseEnv()) {
+    return NextResponse.redirect(`${origin}/?error=supabase-not-configured`);
+  }
 
   if (code) {
     const supabase = await createClient();
@@ -24,5 +29,5 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.redirect(`${origin}/login?error=Could not authenticate user`);
+  return NextResponse.redirect(`${origin}/?error=auth-failed`);
 }

@@ -1,12 +1,15 @@
 'use client';
 
-import { Button, Input, Select } from '@/components/ui';
+import { Button, Input, Select, Textarea } from '@/components/ui';
 import { useState } from 'react';
 import { CreatureCard } from '@/components/features/CreatureCard';
 import { BandValidationPanel } from '@/components/features/BandValidationPanel';
+import { ValidationPanel } from '@/components/features/ValidationPanel';
 import { CONVERSION_PROFILES } from '@/lib/conversion/profiles';
 import { validateBands } from '@/lib/conversion/bandValidation';
+import { SYSTEM_PACKS } from '@/lib/systemPacks';
 import type { OutputCreatureData, ConversionSettings } from '@/types';
+import type { ValidationReport, SystemPackId } from '@/lib/systemPacks/types';
 
 interface Step3ConvertProps {
   outputData: OutputCreatureData;
@@ -15,10 +18,14 @@ interface Step3ConvertProps {
   projectId: string;
   title: string;
   tags: string[];
+  validationReport?: ValidationReport;
+  referenceStatblock: string;
+  outputPackId: SystemPackId;
   onSettingsChange: (settings: ConversionSettings) => void;
   onProjectChange: (id: string) => void;
   onTitleChange: (title: string) => void;
   onTagsChange: (tags: string[]) => void;
+  onReferenceStatblockChange: (reference: string) => void;
   onBack: () => void;
   onSave: () => void;
   saving: boolean;
@@ -31,10 +38,14 @@ export function Step3Convert({
   projectId,
   title,
   tags,
+  validationReport,
+  referenceStatblock,
+  outputPackId,
   onSettingsChange,
   onProjectChange,
   onTitleChange,
   onTagsChange,
+  onReferenceStatblockChange,
   onBack,
   onSave,
   saving,
@@ -58,6 +69,8 @@ export function Step3Convert({
     : null;
 
   const packLabel = profile?.displayName ?? settings.conversionProfileId;
+  const pack = SYSTEM_PACKS[outputPackId];
+  const showValidationPanel = validationReport && (validationReport.hasReference || pack.requiresUserReference || outputPackId === 'dnd5e_srd');
 
   return (
     <div className="space-y-6">
@@ -72,6 +85,10 @@ export function Step3Convert({
           <span className="px-2 py-0.5 rounded border border-border bg-bg-elevated text-text-secondary font-medium">
             {packLabel}
           </span>
+          <span className="text-text-muted">Validation Pack:</span>
+          <span className="px-2 py-0.5 rounded border border-border bg-bg-elevated text-text-secondary font-medium">
+            {pack.displayName}
+          </span>
           {profile?.id.startsWith('shadowdark') && (
             <span className="px-2 py-0.5 rounded border border-accent/30 bg-accent/5 text-text-secondary text-xs">
               Not affiliated · compatibility only
@@ -81,14 +98,13 @@ export function Step3Convert({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* ── Left column: preview ── */}
-        <div>
-          <h3 className="font-semibold text-text-primary mb-4">Converted Creature</h3>
-          <CreatureCard data={outputData} />
-        </div>
+        {/* ── Left column: preview & advanced tuning ── */}
+        <div className="space-y-6">
+          <div>
+            <h3 className="font-semibold text-text-primary mb-4">Converted Creature</h3>
+            <CreatureCard data={outputData} />
+          </div>
 
-        {/* ── Right column: controls ── */}
-        <div className="space-y-5">
           {/* Sliders */}
           <details className="group border border-border rounded-lg overflow-hidden">
             <summary className="flex items-center justify-between px-4 py-3 text-sm font-medium text-text-secondary cursor-pointer hover:bg-bg-elevated select-none list-none focus:outline-none focus-visible:ring-2 focus-visible:ring-accent">
@@ -170,11 +186,14 @@ export function Step3Convert({
 
               <p className="text-xs text-text-muted">
                 Adjusting sliders re-runs the band validation below.
-                100% = profile&apos;s exact target.
+                100% = the profile&apos;s baseline tuning target.
               </p>
             </div>
           </details>
+        </div>
 
+        {/* ── Right column: controls ── */}
+        <div className="space-y-5">
           {/* Save fields */}
           <div className="space-y-4">
             <Input
@@ -205,6 +224,25 @@ export function Step3Convert({
             </div>
           </div>
 
+          {pack.requiresUserReference && (
+            <div className="space-y-3 rounded-lg border border-accent/30 bg-accent/5 p-4">
+              <div>
+                <h3 className="font-semibold text-text-primary">Reference Stat Block</h3>
+                <p className="mt-1 text-xs text-text-muted leading-snug">
+                  Paste the official reference text you own to verify this compatibility conversion.
+                  The text stays local to your browser session.
+                </p>
+              </div>
+              <Textarea
+                label="Reference"
+                placeholder="Paste your reference stat block here..."
+                value={referenceStatblock}
+                onChange={(e) => onReferenceStatblockChange(e.target.value)}
+                className="min-h-[160px] font-mono text-sm"
+              />
+            </div>
+          )}
+
           {/* Band Validation */}
           {bandReport && (
             <BandValidationPanel
@@ -213,6 +251,10 @@ export function Step3Convert({
               settings={settings}
               onSettingsChange={onSettingsChange}
             />
+          )}
+
+          {showValidationPanel && validationReport && (
+            <ValidationPanel report={validationReport} />
           )}
         </div>
       </div>

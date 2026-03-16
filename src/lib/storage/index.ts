@@ -10,6 +10,7 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type { Entry, Project } from '@/types';
+import { getPublicSupabaseEnv } from '@/lib/env';
 
 // ─────────────────────────────────────────────────────────────
 // Device ID management
@@ -34,8 +35,13 @@ function getDeviceId(): string {
 let cachedClient: SupabaseClient | null = null;
 let cachedDeviceId: string | null = null;
 
-function getSupabaseClient(): SupabaseClient {
+function getSupabaseClient(): SupabaseClient | null {
   const deviceId = getDeviceId();
+  const env = getPublicSupabaseEnv();
+
+  if (!env) {
+    return null;
+  }
   
   // Return cached client if device ID hasn't changed
   if (cachedClient && cachedDeviceId === deviceId) {
@@ -44,8 +50,8 @@ function getSupabaseClient(): SupabaseClient {
   
   // Create new client with device_id in global headers
   cachedClient = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    env.url,
+    env.anonKey,
     {
       global: {
         headers: {
@@ -60,7 +66,7 @@ function getSupabaseClient(): SupabaseClient {
 }
 
 // Getter for the supabase client (always use this, not a static instance)
-function supabase(): SupabaseClient {
+function supabase(): SupabaseClient | null {
   return getSupabaseClient();
 }
 
@@ -85,7 +91,10 @@ function lsSet<T>(key: string, data: T[]): void {
 // Entries
 // ─────────────────────────────────────────────────────────────
 export async function getEntries(): Promise<Entry[]> {
-  const { data, error } = await supabase()
+  const client = supabase();
+  if (!client) return lsGet<Entry>(LS_ENTRIES);
+
+  const { data, error } = await client
     .from('entries')
     .select('*')
     .order('updated_at', { ascending: false });
@@ -98,7 +107,10 @@ export async function getEntries(): Promise<Entry[]> {
 }
 
 export async function getEntry(id: string): Promise<Entry | undefined> {
-  const { data, error } = await supabase()
+  const client = supabase();
+  if (!client) return lsGet<Entry>(LS_ENTRIES).find(e => e.id === id);
+
+  const { data, error } = await client
     .from('entries')
     .select('*')
     .eq('id', id)
@@ -122,7 +134,15 @@ export async function saveEntry(
     updated_at: now,
   };
 
-  const { data, error } = await supabase()
+  const client = supabase();
+  if (!client) {
+    const entries = lsGet<Entry>(LS_ENTRIES);
+    entries.push(newEntry);
+    lsSet(LS_ENTRIES, entries);
+    return newEntry;
+  }
+
+  const { data, error } = await client
     .from('entries')
     .insert(newEntry)
     .select()
@@ -144,7 +164,17 @@ export async function updateEntry(
 ): Promise<Entry | undefined> {
   const payload = { ...updates, updated_at: new Date().toISOString() };
 
-  const { data, error } = await supabase()
+  const client = supabase();
+  if (!client) {
+    const entries = lsGet<Entry>(LS_ENTRIES);
+    const idx = entries.findIndex(e => e.id === id);
+    if (idx === -1) return undefined;
+    entries[idx] = { ...entries[idx], ...payload };
+    lsSet(LS_ENTRIES, entries);
+    return entries[idx];
+  }
+
+  const { data, error } = await client
     .from('entries')
     .update(payload)
     .eq('id', id)
@@ -163,7 +193,16 @@ export async function updateEntry(
 }
 
 export async function deleteEntry(id: string): Promise<boolean> {
-  const { error } = await supabase().from('entries').delete().eq('id', id);
+  const client = supabase();
+  if (!client) {
+    const entries = lsGet<Entry>(LS_ENTRIES);
+    const next = entries.filter(e => e.id !== id);
+    if (next.length === entries.length) return false;
+    lsSet(LS_ENTRIES, next);
+    return true;
+  }
+
+  const { error } = await client.from('entries').delete().eq('id', id);
 
   if (error) {
     const entries = lsGet<Entry>(LS_ENTRIES);
@@ -179,7 +218,10 @@ export async function deleteEntry(id: string): Promise<boolean> {
 // Projects
 // ─────────────────────────────────────────────────────────────
 export async function getProjects(): Promise<Project[]> {
-  const { data, error } = await supabase()
+  const client = supabase();
+  if (!client) return lsGet<Project>(LS_PROJECTS);
+
+  const { data, error } = await client
     .from('projects')
     .select('*')
     .order('updated_at', { ascending: false });
@@ -192,7 +234,10 @@ export async function getProjects(): Promise<Project[]> {
 }
 
 export async function getProject(id: string): Promise<Project | undefined> {
-  const { data, error } = await supabase()
+  const client = supabase();
+  if (!client) return lsGet<Project>(LS_PROJECTS).find(p => p.id === id);
+
+  const { data, error } = await client
     .from('projects')
     .select('*')
     .eq('id', id)
@@ -216,7 +261,15 @@ export async function saveProject(
     updated_at: now,
   };
 
-  const { data, error } = await supabase()
+  const client = supabase();
+  if (!client) {
+    const projects = lsGet<Project>(LS_PROJECTS);
+    projects.push(newProject);
+    lsSet(LS_PROJECTS, projects);
+    return newProject;
+  }
+
+  const { data, error } = await client
     .from('projects')
     .insert(newProject)
     .select()
@@ -238,7 +291,17 @@ export async function updateProject(
 ): Promise<Project | undefined> {
   const payload = { ...updates, updated_at: new Date().toISOString() };
 
-  const { data, error } = await supabase()
+  const client = supabase();
+  if (!client) {
+    const projects = lsGet<Project>(LS_PROJECTS);
+    const idx = projects.findIndex(p => p.id === id);
+    if (idx === -1) return undefined;
+    projects[idx] = { ...projects[idx], ...payload };
+    lsSet(LS_PROJECTS, projects);
+    return projects[idx];
+  }
+
+  const { data, error } = await client
     .from('projects')
     .update(payload)
     .eq('id', id)
@@ -257,7 +320,18 @@ export async function updateProject(
 }
 
 export async function deleteProject(id: string): Promise<boolean> {
-  const { error } = await supabase().from('projects').delete().eq('id', id);
+  const client = supabase();
+  if (!client) {
+    const projects = lsGet<Project>(LS_PROJECTS);
+    const next = projects.filter(p => p.id !== id);
+    if (next.length === projects.length) return false;
+    lsSet(LS_PROJECTS, next);
+    const entries = lsGet<Entry>(LS_ENTRIES);
+    lsSet(LS_ENTRIES, entries.map(e => e.project_id === id ? { ...e, project_id: null } : e));
+    return true;
+  }
+
+  const { error } = await client.from('projects').delete().eq('id', id);
 
   if (error) {
     const projects = lsGet<Project>(LS_PROJECTS);
@@ -271,7 +345,7 @@ export async function deleteProject(id: string): Promise<boolean> {
   }
 
   // also null-out project_id on entries in Supabase
-  await supabase().from('entries').update({ project_id: null }).eq('project_id', id);
+  await client.from('entries').update({ project_id: null }).eq('project_id', id);
   return true;
 }
 
@@ -280,6 +354,16 @@ export async function deleteProject(id: string): Promise<boolean> {
 // ─────────────────────────────────────────────────────────────
 export async function getEntriesCount(): Promise<{ creatures: number; notes: number; projects: number }> {
   const client = supabase();
+  if (!client) {
+    const entries = lsGet<Entry>(LS_ENTRIES);
+    const projects = lsGet<Project>(LS_PROJECTS);
+    return {
+      creatures: entries.filter(e => e.type === 'creature').length,
+      notes: entries.filter(e => e.type === 'adventure_note').length,
+      projects: projects.length,
+    };
+  }
+
   const [creaturesRes, notesRes, projectsRes] = await Promise.all([
     client.from('entries').select('id', { count: 'exact', head: true }).eq('type', 'creature'),
     client.from('entries').select('id', { count: 'exact', head: true }).eq('type', 'adventure_note'),
@@ -304,7 +388,14 @@ export async function getEntriesCount(): Promise<{ creatures: number; notes: num
 }
 
 export async function getRecentEntries(limit = 5): Promise<Entry[]> {
-  const { data, error } = await supabase()
+  const client = supabase();
+  if (!client) {
+    return lsGet<Entry>(LS_ENTRIES)
+      .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+      .slice(0, limit);
+  }
+
+  const { data, error } = await client
     .from('entries')
     .select('*')
     .order('updated_at', { ascending: false })
@@ -359,7 +450,10 @@ function lsSetRef(entryId: string | null, rawText: string): void {
  */
 export async function getReferenceStatblock(entryId: string | null): Promise<string> {
   const deviceId = getDeviceId();
-  const query = supabase()
+  const client = supabase();
+  if (!client) return lsGetRef(entryId);
+
+  const query = client
     .from('device_reference_statblocks')
     .select('raw_text')
     .eq('device_id', deviceId);
@@ -383,7 +477,10 @@ export async function saveReferenceStatblock(
   const deviceId = getDeviceId();
   lsSetRef(entryId, rawText); // Always persist locally first
 
-  const { error } = await supabase()
+  const client = supabase();
+  if (!client) return;
+
+  const { error } = await client
     .from('device_reference_statblocks')
     .upsert(
       { device_id: deviceId, entry_id: entryId, raw_text: rawText },
@@ -401,7 +498,10 @@ export async function saveReferenceStatblock(
 export async function deleteReferenceStatblock(entryId: string | null): Promise<void> {
   lsSetRef(entryId, '');
   const deviceId = getDeviceId();
-  const query = supabase()
+  const client = supabase();
+  if (!client) return;
+
+  const query = client
     .from('device_reference_statblocks')
     .delete()
     .eq('device_id', deviceId);

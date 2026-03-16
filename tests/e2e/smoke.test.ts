@@ -4,7 +4,7 @@ test.describe('Smoke Tests', () => {
   test('landing page loads', async ({ page }) => {
     await page.goto('/');
     
-    await expect(page.locator('h1')).toContainText('Duskwarden Tools');
+    await expect(page.getByText('Duskwarden | 5e/OSE to OSR Monster Converter')).toBeVisible();
     await expect(page.locator('text=Open App')).toBeVisible();
     await expect(page.locator('text=independent product')).toBeVisible();
   });
@@ -57,51 +57,67 @@ test.describe('App Pages Load', () => {
   });
 });
 
-test.describe('Output System selection', () => {
-  test('selecting Shadowdark verify shows compatibility note and Reference textarea', async ({ page }) => {
+test.describe('Conversion page smoke', () => {
+  test('selecting Shadowdark output shows compatibility note', async ({ page }) => {
     await page.goto('/app/convert');
+    await page.getByLabel('Output System (conversion)').selectOption('shadowdark_compatible_v1');
 
-    // Select Shadowdark verify pack
-    await page.selectOption('select[aria-describedby="pack-hint"]', 'shadowdark_private_verify');
-
-    // Compatibility note appears
     await expect(page.locator('text=Compatibility profile for use with Shadowdark RPG')).toBeVisible();
-
-    // Reference textarea appears
-    await expect(page.locator('text=Reference Stat Block')).toBeVisible();
   });
 
-  test('Shadowdark reference textarea accepts user input and stays on page', async ({ page }) => {
+  test('parsing 5e goblin reaches review step with SRD validation', async ({ page }) => {
     await page.goto('/app/convert');
-    await page.selectOption('select[aria-describedby="pack-hint"]', 'shadowdark_private_verify');
+    await page.locator('textarea[placeholder*="Paste a stat block"]').fill(
+      'Goblin\nArmor Class 15\nHit Points 7 (2d6)\nSpeed 30 ft.\nScimitar. Melee Weapon Attack: +4 to hit, Hit: 5 (1d6 + 2) slashing damage.'
+    );
+    await page.click('button:has-text("Parse Stat Block")');
 
-    const refText = 'Goblin\nAC 12\nHP 4\nAttack: Dagger +2 (1d4)';
-    // Fill the SECOND textarea (reference, not source)
-    const textareas = page.locator('textarea');
-    await textareas.nth(1).fill(refText);
-    await expect(textareas.nth(1)).toHaveValue(refText);
+    await expect(page.locator('text=Validation Pack:')).toBeVisible();
+    await expect(page.locator('text=D&D 5e (SRD)')).toBeVisible();
+    await expect(page.locator('text=How This Was Tuned')).toBeVisible();
   });
 
-  test('switching to Shadowdark then back to OSR hides reference textarea', async ({ page }) => {
+  test('pasting old-school text auto-detects and applies the source system before manual override', async ({ page }) => {
     await page.goto('/app/convert');
-    await page.selectOption('select[aria-describedby="pack-hint"]', 'shadowdark_private_verify');
-    await expect(page.locator('text=Reference Stat Block')).toBeVisible();
+    await page.locator('textarea[placeholder*="Paste a stat block"]').fill(
+      'Skeleton\nAC 7 [12], HD 1, Att 1 x weapon (1d6), THAC0 19 [+0], MV 60\' (20\'), SV F1, ML 12'
+    );
 
-    await page.selectOption('select[aria-describedby="pack-hint"]', 'osr_generic');
-    await expect(page.locator('text=Reference Stat Block')).not.toBeVisible();
-    await expect(page.locator('text=Compatibility profile for use with Shadowdark RPG')).not.toBeVisible();
+    await expect(page.getByLabel('Source System')).toHaveValue('ose');
+    await expect(page.locator('text=Detected from pasted text:')).toBeVisible();
   });
 
-  test('SRD pack shows CC BY 4.0 attribution note', async ({ page }) => {
+  test('full-word OSE table wording auto-detects as OSE', async ({ page }) => {
     await page.goto('/app/convert');
-    await page.selectOption('select[aria-describedby="pack-hint"]', 'dnd5e_srd');
-    await expect(page.locator('text=CC BY 4.0')).toBeVisible();
+    await page.locator('textarea[placeholder*="Paste a stat block"]').fill(
+      'Skeleton\nArmour Class 7 [12]\nHit Dice 1 (4hp)\nAttacks 1 × weapon (1d6 or by weapon)\nTHAC0 19 [0]\nMovement 60\' (20\')\nSaving Throws D12 W13 P14 B15 S16 (1)\nMorale 12\nNumber Appearing 3d4 (3d10)\nTreasure Type None'
+    );
+
+    await expect(page.getByLabel('Source System')).toHaveValue('ose');
+    await expect(page.locator('text=Detected from pasted text: OSE')).toBeVisible();
   });
 
-  test('output preview updates when source text is pasted', async ({ page }) => {
+  test('manual source selection is preserved after detection and offers a switch suggestion', async ({ page }) => {
     await page.goto('/app/convert');
-    const statBlock = `Goblin\nAC 15\nHP 7\nSpeed 30 ft.\nMelee Attack: Scimitar +4 to hit, 1d6+2 slashing damage`;
-    await page.fill('textarea', statBlock);
-    await expect(page.locator('[aria-label="Output preview"]')).toBeVisible();
+    await page.getByLabel('Source System').selectOption('other');
+    await page.locator('textarea[placeholder*="Paste a stat block"]').fill(
+      'Goblin\nArmor Class 15\nHit Points 7 (2d6)\nChallenge 1/4\nActions\nScimitar. Melee Weapon Attack: +4 to hit, Hit: 5 (1d6 + 2) slashing damage.'
+    );
+
+    await expect(page.getByLabel('Source System')).toHaveValue('other');
+    await expect(page.locator('text=Use detected system')).toBeVisible();
+  });
+
+  test('generic narrative traits stay out of saves and appear as special actions', async ({ page }) => {
+    await page.goto('/app/convert');
+    await page.getByLabel('Source System').selectOption('other');
+    await page.locator('textarea[placeholder*="Paste a stat block"]').fill(
+      'Bandit\n4 HP, 1 Armor, 12 STR, 12 DEX, 9 WIL, short sword (d6) or short bow (d6)\nLoyal: When testing Morale, save using the leader\'s WIL (13). If the leader dies, the others will flee.'
+    );
+    await page.click('button:has-text("Parse Stat Block")');
+
+    await expect(page.locator('text=Special Actions')).toBeVisible();
+    await expect(page.locator('text=Loyal')).toBeVisible();
+    await expect(page.getByText('+3 vs physical effects', { exact: true })).toBeVisible();
   });
 });

@@ -15,11 +15,11 @@ export interface TierStats {
 }
 
 export const TIER_STATS: Record<number, TierStats> = {
-  1: { hpRange: [4, 8],    acRange: [10, 11], attackBonusRange: [1, 2],   baseDamage: '1d4',  morale: 7 },
-  2: { hpRange: [9, 18],   acRange: [12, 13], attackBonusRange: [3, 4],   baseDamage: '1d6',  morale: 8 },
-  3: { hpRange: [19, 35],  acRange: [13, 15], attackBonusRange: [5, 6],   baseDamage: '1d8',  morale: 9 },
-  4: { hpRange: [36, 70],  acRange: [15, 17], attackBonusRange: [7, 9],   baseDamage: '1d10', morale: 10 },
-  5: { hpRange: [71, 150], acRange: [17, 19], attackBonusRange: [10, 12], baseDamage: '2d6',  morale: 11 },
+  1: { hpRange: [4, 8],    acRange: [10, 11], attackBonusRange: [0, 1],  baseDamage: '1d4',  morale: 7 },
+  2: { hpRange: [9, 18],   acRange: [12, 13], attackBonusRange: [1, 3],  baseDamage: '1d6',  morale: 8 },
+  3: { hpRange: [19, 35],  acRange: [13, 15], attackBonusRange: [3, 5],  baseDamage: '1d8',  morale: 9 },
+  4: { hpRange: [36, 70],  acRange: [15, 17], attackBonusRange: [6, 8],  baseDamage: '1d10', morale: 10 },
+  5: { hpRange: [71, 150], acRange: [17, 19], attackBonusRange: [8, 10], baseDamage: '2d6',  morale: 11 },
 };
 
 export function levelToTier(level: number): 1 | 2 | 3 | 4 | 5 {
@@ -30,9 +30,15 @@ export function levelToTier(level: number): 1 | 2 | 3 | 4 | 5 {
   return 5;
 }
 
-export function crToLevel(cr: string): number {
-  if (cr.includes('/')) return 0;
-  return parseInt(cr, 10) || 1;
+export function crToTier(cr: string): 1 | 2 | 3 | 4 | 5 {
+  if (cr.includes('/')) return 1;
+
+  const numericCr = parseInt(cr, 10);
+  if (Number.isNaN(numericCr) || numericCr <= 1) return 1;
+  if (numericCr <= 4) return 2;
+  if (numericCr <= 8) return 3;
+  if (numericCr <= 12) return 4;
+  return 5;
 }
 
 export function inferTierFromStats(parsed: ParsedCreatureData): 1 | 2 | 3 | 4 | 5 {
@@ -48,9 +54,10 @@ export function determineThreatTier(
   parsed: ParsedCreatureData,
   options: ConvertOptions
 ): 1 | 2 | 3 | 4 | 5 {
+  if (options.targetTier  !== undefined) return options.targetTier;
   if (options.targetLevel !== undefined) return levelToTier(options.targetLevel);
   if (parsed.level !== undefined) return levelToTier(parsed.level);
-  if (parsed.cr !== undefined) return levelToTier(crToLevel(parsed.cr));
+  if (parsed.cr !== undefined) return crToTier(parsed.cr);
   return inferTierFromStats(parsed);
 }
 
@@ -102,11 +109,14 @@ export function convertAttacks(
   if (sourceAttacks.length === 0) {
     return [{ name: 'Attack', bonus: midBonus, damage: scaleDamage(tierStats.baseDamage, effective) }];
   }
-  return sourceAttacks.map(a => ({
-    name: a.name,
-    bonus: a.bonus ?? midBonus,
-    damage: a.damage ? scaleDamage(a.damage, effective) : scaleDamage(tierStats.baseDamage, effective),
-    description: a.description,
+
+  return sourceAttacks.slice(0, 5).map((attack) => ({
+    name: attack.name,
+    bonus: attack.bonus !== undefined
+      ? Math.max(midBonus - 1, Math.min(midBonus + 1, Math.round((attack.bonus + midBonus) / 2)))
+      : midBonus,
+    damage: attack.damage ? scaleDamage(attack.damage, effective) : scaleDamage(tierStats.baseDamage, effective),
+    description: attack.description,
   }));
 }
 
@@ -118,6 +128,8 @@ export function extractTraits(parsed: ParsedCreatureData): string[] {
   const traits: string[] = [];
   if (parsed.movement?.toLowerCase().includes('fly'))  traits.push('Flying');
   if (parsed.movement?.toLowerCase().includes('swim')) traits.push('Aquatic');
+  if (parsed.movement?.toLowerCase().includes('climb')) traits.push('Climber');
+  if (parsed.movement?.toLowerCase().includes('burrow')) traits.push('Burrower');
   return traits;
 }
 
@@ -171,7 +183,7 @@ export function buildConvertedStat(
   const saves = parsed.saves ?? generateDefaultSaves(tier);
   const traits = extractTraits(parsed);
   const specialActions = parsed.specialActions?.slice(0, 3) ?? [];
-  const morale = tierStats.morale;
+  const morale = parsed.morale ?? tierStats.morale;
   const lootNotes = generateLootNotes(tier);
 
   // outputProfile bridges legacy OutputCreatureData and new ConvertedStat

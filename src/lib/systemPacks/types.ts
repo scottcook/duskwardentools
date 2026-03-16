@@ -10,7 +10,7 @@
  * ADDING A NEW PACK: see /README.md#adding-a-system-pack
  */
 
-import type { ParsedCreatureData, Attack, SpecialAction } from '@/types';
+import type { ParsedCreatureData, Attack, SpecialAction, SourceSystem } from '@/types';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Identifiers
@@ -83,6 +83,8 @@ export interface ConvertOptions {
   deadliness: number;      // 0.5–2.0
   durability: number;      // 0.5–2.0
   targetLevel?: number;
+  /** Direct threat-tier override (1–5). Takes priority over targetLevel. */
+  targetTier?: 1 | 2 | 3 | 4 | 5;
   role?: string;
 }
 
@@ -140,7 +142,7 @@ export interface SystemPack {
   requiresUserReference: boolean;
 
   /** Parse raw text into structured ParsedCreatureData */
-  parseSourceStatblock(inputText: string): ParsedCreatureData;
+  parseSourceStatblock(inputText: string, systemHint?: SourceSystem): ParsedCreatureData;
 
   /**
    * Look up a canonical stat block by creature name.

@@ -34,16 +34,18 @@ export interface BandValidationReport {
 
 function calcDPR(attacks: Array<{ bonus?: number; damage?: string }>): number {
   if (!attacks.length) return 0;
-  // Average DPR = sum of per-attack avg damage (first attack only if complex)
-  const primary = attacks[0];
-  if (!primary.damage) return 0;
-  const match = primary.damage.match(/(\d+)d(\d+)(?:\s*([+-])\s*(\d+))?/);
-  if (!match) return 0;
-  const numDice  = parseInt(match[1], 10);
-  const dieSize  = parseInt(match[2], 10);
-  const sign     = match[3] === '-' ? -1 : 1;
-  const modifier = match[4] ? parseInt(match[4], 10) * sign : 0;
-  return numDice * ((dieSize + 1) / 2) + modifier;
+  return attacks.reduce((total, attack) => {
+    if (!attack.damage) return total;
+
+    const match = attack.damage.match(/(\d+)d(\d+)(?:\s*([+-])\s*(\d+))?/);
+    if (!match) return total;
+
+    const numDice  = parseInt(match[1], 10);
+    const dieSize  = parseInt(match[2], 10);
+    const sign     = match[3] === '-' ? -1 : 1;
+    const modifier = match[4] ? parseInt(match[4], 10) * sign : 0;
+    return total + (numDice * ((dieSize + 1) / 2) + modifier);
+  }, 0);
 }
 
 export function validateBands(

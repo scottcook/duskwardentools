@@ -32,11 +32,11 @@ export const shadowdarkCompatibleProfile: ConversionProfile = {
 
   // OUR OWN numeric targets — lean HP, moderate AC, crisp DPR
   baseTierTargets: {
-    1: { acTarget: 11, hpTarget:  4, attackBonusTarget: 1, dprTarget:  3.5 },
-    2: { acTarget: 12, hpTarget:  8, attackBonusTarget: 2, dprTarget:  5.5 },
-    3: { acTarget: 14, hpTarget: 16, attackBonusTarget: 4, dprTarget:  8.5 },
-    4: { acTarget: 15, hpTarget: 28, attackBonusTarget: 6, dprTarget: 13.5 },
-    5: { acTarget: 17, hpTarget: 50, attackBonusTarget: 8, dprTarget: 21.0 },
+    1: { acTarget: 11, hpTarget:  5, attackBonusTarget: 1, dprTarget:  3.5 },
+    2: { acTarget: 12, hpTarget:  9, attackBonusTarget: 2, dprTarget:  5.5 },
+    3: { acTarget: 13, hpTarget: 18, attackBonusTarget: 3, dprTarget:  8.5 },
+    4: { acTarget: 15, hpTarget: 32, attackBonusTarget: 5, dprTarget: 13.5 },
+    5: { acTarget: 17, hpTarget: 54, attackBonusTarget: 7, dprTarget: 21.0 },
   },
 
   roleModifiers: {

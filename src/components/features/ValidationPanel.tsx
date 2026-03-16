@@ -69,7 +69,7 @@ export function ValidationPanel({ report, onApplyField, onApplyAll }: Validation
           {report.hasReference ? 'Validation Report' : 'Reference Required'}
         </h3>
         {report.hasReference && (
-          <span className="text-xs text-text-muted">Accuracy</span>
+          <span className="text-xs text-text-muted">Reference match</span>
         )}
       </div>
 

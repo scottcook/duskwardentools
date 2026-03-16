@@ -5,6 +5,7 @@ export type CreatureRole = 'brute' | 'skirmisher' | 'caster' | 'boss' | 'minion'
 export type SourceSystem = '5e' | 'bx' | 'ose' | 'other';
 
 export type ThreatTier = 1 | 2 | 3 | 4 | 5;
+export type DetectionConfidence = 'low' | 'medium' | 'high';
 
 /** Output profile controls tuning presets and formatting toggles. */
 export type OutputProfile =
@@ -83,6 +84,8 @@ export interface ParsedCreatureData {
   specialActions?: SpecialAction[];
   cr?: string;
   level?: number;
+  morale?: number;
+  thac0?: number;
   system?: SourceSystem;
 }
 
@@ -185,6 +188,8 @@ export interface ConversionSettings {
   deadliness: number;
   durability: number;
   targetLevel?: number;
+  /** Direct threat-tier override (1–5). Takes priority over targetLevel. */
+  targetTier?: ThreatTier;
   role?: CreatureRole;
   outputProfile: OutputProfile;
   /** Active system pack id — drives conversion logic */
@@ -197,6 +202,10 @@ export interface WizardState {
   step: 1 | 2 | 3 | 4;
   sourceText: string;
   sourceSystem: SourceSystem;
+  detectedSourceSystem?: SourceSystem;
+  detectedSourceSystemConfidence?: DetectionConfidence;
+  hasManualSourceSystemSelection: boolean;
+  creatureName: string;
   metadata: {
     intendedLevel?: number;
     role?: CreatureRole;
@@ -208,4 +217,6 @@ export interface WizardState {
   referenceStatblock?: string;
   /** Validation report from the active pack's validate() */
   validationReport?: import('@/lib/systemPacks/types').ValidationReport;
+  /** Whether the pasted text looks like a valid stat block */
+  isStatblockValid?: boolean;
 }

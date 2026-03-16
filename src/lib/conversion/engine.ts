@@ -36,9 +36,15 @@ import {
 // Tier resolution
 // ─────────────────────────────────────────────────────────────────────────────
 
-function crToLevel(cr: string): number {
-  if (cr.includes('/')) return 0;
-  return parseInt(cr, 10) || 1;
+function crToTier(cr: string): ThreatTier {
+  if (cr.includes('/')) return 1;
+
+  const numericCr = parseInt(cr, 10);
+  if (Number.isNaN(numericCr) || numericCr <= 1) return 1;
+  if (numericCr <= 4) return 2;
+  if (numericCr <= 8) return 3;
+  if (numericCr <= 12) return 4;
+  return 5;
 }
 
 function levelToTier(level: number): ThreatTier {
@@ -61,9 +67,10 @@ export function determineThreatTier(
   parsed: ParsedCreatureData,
   settings: ConversionSettings
 ): ThreatTier {
+  if (settings.targetTier  !== undefined) return settings.targetTier;
   if (settings.targetLevel !== undefined) return levelToTier(settings.targetLevel);
   if (parsed.level !== undefined)         return levelToTier(parsed.level);
-  if (parsed.cr   !== undefined)          return levelToTier(crToLevel(parsed.cr));
+  if (parsed.cr   !== undefined)          return crToTier(parsed.cr);
   return inferTierFromHP(parsed.hp ?? 10);
 }
 
@@ -121,7 +128,7 @@ function buildAttacks(
   deadlinessMultiplier: number
 ): Attack[] {
   const effectiveDPR = dprTarget * deadlinessMultiplier;
-  const ab           = attackBonusTarget;
+  const ab = attackBonusTarget;
 
   if (sourceAttacks.length === 0) {
     return [{
@@ -131,13 +138,15 @@ function buildAttacks(
     }];
   }
 
-  // Cap at 3 attacks (complexity budget)
-  const capped = sourceAttacks.slice(0, 3);
-
-  // Distribute DPR across attacks (primary gets 60%, others split the rest)
-  const dprShares = capped.length === 1
-    ? [effectiveDPR]
-    : [effectiveDPR * 0.6, ...Array(capped.length - 1).fill(effectiveDPR * 0.4 / (capped.length - 1))];
+  const capped = sourceAttacks.slice(0, 5);
+  const sourceAverages = capped.map((attack) => parseDice(attack.damage ?? '')?.avg ?? 0);
+  const sourceTotal = sourceAverages.reduce((sum, avg) => sum + avg, 0);
+  const dprShares = capped.map((_, index) => {
+    if (sourceTotal > 0) {
+      return effectiveDPR * (sourceAverages[index] / sourceTotal);
+    }
+    return effectiveDPR / capped.length;
+  });
 
   return capped.map((src, i) => {
     const targetShare = dprShares[i];
@@ -157,7 +166,9 @@ function buildAttacks(
 
     return {
       name: src.name,
-      bonus: ab,
+      bonus: src.bonus !== undefined
+        ? Math.max(ab - 1, Math.min(ab + 1, Math.round((src.bonus + ab) / 2)))
+        : ab,
       damage,
       description: src.description,
     };
@@ -237,7 +248,7 @@ export function convertCreature(
   const saves    = parsed.saves ?? `+${tier + 2} vs physical effects`;
   const traits   = extractTraits(parsed);
   const specialActions = parsed.specialActions?.slice(0, 3) ?? [];
-  const morale   = targets.moraleTarget ?? 0;
+  const morale   = parsed.morale ?? targets.moraleTarget ?? 0;
   const lootNotes = generateLootNotes(tier);
 
   // Tuning metadata
@@ -295,6 +306,7 @@ export function getDefaultSettings(): ConversionSettings {
     deadliness: 1.0,
     durability: 1.0,
     targetLevel: undefined,
+    targetTier: undefined,
     role: undefined,
     outputProfile: 'osr_generic',
     outputPackId: 'osr_generic',
@@ -309,6 +321,9 @@ export function validateSettings(settings: ConversionSettings): ConversionSettin
     durability: Math.max(0.5, Math.min(2.0, settings.durability)),
     targetLevel: settings.targetLevel !== undefined
       ? Math.max(0, Math.min(20, settings.targetLevel))
+      : undefined,
+    targetTier: settings.targetTier !== undefined
+      ? Math.max(1, Math.min(5, settings.targetTier)) as ConversionSettings['targetTier']
       : undefined,
     conversionProfileId: settings.conversionProfileId ?? 'osr_generic_v1',
     outputPackId: settings.outputPackId ?? 'osr_generic',

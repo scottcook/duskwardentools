@@ -1,7 +1,13 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { parseStatBlock, createEmptyParsedData } from '@/lib/parser';
 
 describe('parseStatBlock', () => {
+  const goblin5e = readFileSync(join(process.cwd(), 'tests/unit/fixtures/goblin-5e.txt'), 'utf8');
+  const skeletonOse = readFileSync(join(process.cwd(), 'tests/unit/fixtures/skeleton-ose.txt'), 'utf8');
+  const orcBx = readFileSync(join(process.cwd(), 'tests/unit/fixtures/orc-bx.txt'), 'utf8');
+
   it('should return empty data for empty input', () => {
     const result = parseStatBlock('');
     expect(result.success).toBe(false);
@@ -49,24 +55,15 @@ describe('parseStatBlock', () => {
   });
 
   it('should parse a full 5e-style stat block', () => {
-    const statBlock = `
-Goblin
-Small humanoid, neutral evil
-
-Armor Class 15 (leather armor, shield)
-Hit Points 7 (2d6)
-Speed 30 ft.
-
-Melee Attack: Scimitar +4 to hit, 1d6+2 slashing damage
-    `;
-
-    const result = parseStatBlock(statBlock, '5e');
+    const result = parseStatBlock(goblin5e, '5e');
     
     expect(result.success).toBe(true);
     expect(result.data.name).toBe('Goblin');
     expect(result.data.ac).toBe(15);
     expect(result.data.hp).toBe(7);
     expect(result.data.movement).toContain('30');
+    expect(result.data.attacks).toHaveLength(2);
+    expect(result.data.specialActions?.[0]?.name).toBe('Nimble Escape');
     expect(result.confidence).toBeGreaterThan(0.5);
   });
 
@@ -97,15 +94,65 @@ Ranged Attack: Javelin +5 to hit, 1d6+3 piercing damage
     expect(result.confidence).toBeLessThan(0.5);
   });
 
-  it('should handle OSE/BX style stat blocks', () => {
-    const statBlock = `
-Skeleton
-AC 7, HD 1, Att 1 × weapon (1d6), MV 60' (20')
-    `;
-
-    const result = parseStatBlock(statBlock, 'bx');
+  it('should parse OSE monster conventions from a fixture', () => {
+    const result = parseStatBlock(skeletonOse, 'ose');
     expect(result.data.name).toBe('Skeleton');
-    expect(result.data.ac).toBeDefined();
+    expect(result.data.ac).toBe(12);
+    expect(result.data.hp).toBe(5);
+    expect(result.data.level).toBe(1);
+    expect(result.data.attacks?.[0]?.bonus).toBe(0);
+    expect(result.data.attacks?.[0]?.damage).toBe('1d6');
+    expect(result.data.morale).toBe(12);
+    expect(result.data.saves).toContain('F1');
+  });
+
+  it('should parse B/X monster conventions from a fixture', () => {
+    const result = parseStatBlock(orcBx, 'bx');
+    expect(result.data.name).toBe('Orc');
+    expect(result.data.ac).toBe(13);
+    expect(result.data.hp).toBe(5);
+    expect(result.data.attacks?.[0]?.bonus).toBe(0);
+    expect(result.data.movement).toContain("90 ft");
+    expect(result.data.morale).toBe(8);
+  });
+
+  it('should parse full-word OSE stat tables from pasted text', () => {
+    const result = parseStatBlock(`Skeleton
+Armour Class 7 [12]
+Hit Dice 1 (4hp)
+Attacks 1 × weapon (1d6 or by weapon)
+THAC0 19 [0]
+Movement 60' (20')
+Saving Throws D12 W13 P14 B15 S16 (1)
+Morale 12
+Alignment Chaotic
+XP 10
+Number Appearing 3d4 (3d10)
+Treasure Type None
+Undead: Make no noise until they attack. Immune to effects that affect living creatures.`, 'ose');
+
+    expect(result.data.ac).toBe(12);
+    expect(result.data.hp).toBe(4);
+    expect(result.data.movement).toContain('60 ft');
+    expect(result.data.attacks?.[0]?.damage).toBe('1d6orbyweapon');
+    expect(result.data.saves).toBe('D12 W13 P14 B15 S16 (1)');
+    expect(result.data.morale).toBe(12);
+    expect(result.data.specialActions?.some((action) => action.name === 'Undead')).toBe(true);
+  });
+
+  it('should preserve B/X Save As text instead of truncating it', () => {
+    const result = parseStatBlock('Orc\nAC 6 [13], HD 1, Move 120\' (40\'), Attacks 1 weapon (1d6), Save As Fighter: 1, Morale 8', 'bx');
+
+    expect(result.data.saves).toBe('Save As Fighter: 1');
+  });
+
+  it('should not parse generic narrative text into saves', () => {
+    const result = parseStatBlock(`Bandit
+4 HP, 1 Armor, 12 STR, 12 DEX, 9 WIL, short sword (d6) or short bow (d6)
+Loyal: When testing Morale, save using the leader's WIL (13). If the leader dies, the others will flee.`, 'other');
+
+    expect(result.data.saves).toBeUndefined();
+    expect(result.data.specialActions?.some((action) => action.name === 'Loyal')).toBe(true);
   });
 });
 
@@ -121,5 +168,7 @@ describe('createEmptyParsedData', () => {
     expect(data.abilities).toEqual([]);
     expect(data.specialActions).toEqual([]);
     expect(data.system).toBe('other');
+    expect(data.morale).toBeUndefined();
+    expect(data.thac0).toBeUndefined();
   });
 });

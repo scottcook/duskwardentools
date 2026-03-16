@@ -24,8 +24,8 @@ export const osrGenericProfile: ConversionProfile = {
 
   baseTierTargets: {
     1: { acTarget: 11, hpTarget:  6, attackBonusTarget: 1, dprTarget:  3.5, moraleTarget:  7 },
-    2: { acTarget: 12, hpTarget: 12, attackBonusTarget: 3, dprTarget:  5.5, moraleTarget:  8 },
-    3: { acTarget: 14, hpTarget: 22, attackBonusTarget: 5, dprTarget:  8.5, moraleTarget:  9 },
+    2: { acTarget: 12, hpTarget: 12, attackBonusTarget: 2, dprTarget:  5.5, moraleTarget:  8 },
+    3: { acTarget: 14, hpTarget: 22, attackBonusTarget: 4, dprTarget:  8.5, moraleTarget:  9 },
     4: { acTarget: 15, hpTarget: 40, attackBonusTarget: 7, dprTarget: 13.5, moraleTarget: 10 },
     5: { acTarget: 17, hpTarget: 72, attackBonusTarget: 9, dprTarget: 21.0, moraleTarget: 11 },
   },

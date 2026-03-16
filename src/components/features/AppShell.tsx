@@ -65,10 +65,10 @@ export function AppShell({ children }: { children: ReactNode }) {
       <header className="sticky top-0 z-40 bg-bg-base/80 backdrop-blur-sm border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-8">
+            <div className="flex items-center gap-6">
               <Link
                 href="/app"
-                className="text-4xl text-text-primary hover:text-accent transition-colors"
+                className="text-2xl sm:text-3xl text-text-primary hover:text-accent transition-colors shrink-0"
                 style={{ fontFamily: 'var(--font-unifraktur)' }}
               >
                 Duskwarden
@@ -95,10 +95,10 @@ export function AppShell({ children }: { children: ReactNode }) {
               </nav>
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
               <Link
                 href="/app/settings"
-                className="p-2 text-text-muted hover:text-text-primary rounded-lg hover:bg-bg-elevated transition-colors focus:outline-none focus:ring-2 focus:ring-accent"
+                className="p-2.5 text-text-muted hover:text-text-primary rounded-lg hover:bg-bg-elevated transition-colors focus:outline-none focus:ring-2 focus:ring-accent min-w-[44px] min-h-[44px] flex items-center justify-center"
                 aria-label="Settings"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -110,7 +110,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <button
                 type="button"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="md:hidden p-2 text-text-muted hover:text-text-primary rounded-lg hover:bg-bg-elevated transition-colors focus:outline-none focus:ring-2 focus:ring-accent"
+                className="md:hidden p-2.5 text-text-muted hover:text-text-primary rounded-lg hover:bg-bg-elevated transition-colors focus:outline-none focus:ring-2 focus:ring-accent min-w-[44px] min-h-[44px] flex items-center justify-center"
                 aria-label="Toggle menu"
                 aria-expanded={mobileMenuOpen}
               >
@@ -128,14 +128,14 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         {mobileMenuOpen && (
           <nav className="md:hidden border-t border-border bg-bg-surface" aria-label="Mobile navigation">
-            <div className="px-4 py-2 space-y-1">
+            <div className="px-4 py-3 space-y-1">
               {navItems.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
                   onClick={() => setMobileMenuOpen(false)}
                   className={`
-                    flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors
+                    flex items-center gap-3 px-4 py-3 rounded-lg text-base font-medium transition-colors min-h-[48px]
                     ${isActive(item.href)
                       ? 'bg-accent/10 text-accent'
                       : 'text-text-muted hover:text-text-primary hover:bg-bg-elevated'

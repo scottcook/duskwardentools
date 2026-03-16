@@ -34,6 +34,28 @@ const STRING_FIELDS:  StringKey[]  = ['name', 'movement', 'saves'];
 /** Tolerance band for numeric fields (fraction of reference value) */
 const NUMERIC_TOLERANCE = 0.15;
 
+function averageDamage(expr?: string): number | undefined {
+  if (!expr) return undefined;
+  const match = expr.match(/(\d+)d(\d+)(?:\s*([+-])\s*(\d+))?/);
+  if (!match) return undefined;
+
+  const numDice = parseInt(match[1], 10);
+  const dieSize = parseInt(match[2], 10);
+  const sign = match[3] === '-' ? -1 : 1;
+  const modifier = match[4] ? parseInt(match[4], 10) * sign : 0;
+  return numDice * ((dieSize + 1) / 2) + modifier;
+}
+
+function totalDpr(attacks: ConvertedStat['attacks'] | undefined): number | undefined {
+  if (!attacks?.length) return undefined;
+  const values = attacks
+    .map((attack) => averageDamage(attack.damage))
+    .filter((value): value is number => value !== undefined);
+
+  if (!values.length) return undefined;
+  return values.reduce((sum, value) => sum + value, 0);
+}
+
 function compareNumeric(converted: number, reference: number): FieldMatchStatus {
   if (reference === 0) return converted === 0 ? 'match' : 'mismatch';
   const delta = Math.abs(converted - reference) / Math.abs(reference);
@@ -100,6 +122,66 @@ export function generateValidationReport(
       status: convAttackCount === refAttackCount ? 'match' : 'mismatch',
       converted: convAttackCount,
       reference: refAttackCount,
+    });
+
+    const convTotalDpr = totalDpr(converted.attacks);
+    const refTotalDpr = totalDpr(ref.attacks as ConvertedStat['attacks'] | undefined);
+    if (convTotalDpr !== undefined && refTotalDpr !== undefined) {
+      const status = compareNumeric(convTotalDpr, refTotalDpr);
+      diffs.push({
+        field: 'attacks (total DPR)',
+        status,
+        converted: Math.round(convTotalDpr * 10) / 10,
+        reference: Math.round(refTotalDpr * 10) / 10,
+        suggested: status === 'mismatch' ? Math.round(refTotalDpr * 10) / 10 : undefined,
+      });
+    }
+
+    ref.attacks?.slice(0, 3).forEach((refAttack, index) => {
+      const convAttack = converted.attacks[index];
+      if (!convAttack) {
+        diffs.push({
+          field: `attacks[${index}]`,
+          status: 'missing',
+          converted: undefined,
+          reference: `${refAttack.name} (${refAttack.damage ?? 'n/a'})`,
+        });
+        return;
+      }
+
+      diffs.push({
+        field: `attacks[${index}] name`,
+        status: compareString(convAttack.name, refAttack.name),
+        converted: convAttack.name,
+        reference: refAttack.name,
+        suggested: convAttack.name.trim().toLowerCase() === refAttack.name.trim().toLowerCase() ? undefined : refAttack.name,
+      });
+
+      if (refAttack.bonus !== undefined && convAttack.bonus !== undefined) {
+        const status = compareNumeric(convAttack.bonus, refAttack.bonus);
+        diffs.push({
+          field: `attacks[${index}] bonus`,
+          status,
+          converted: convAttack.bonus,
+          reference: refAttack.bonus,
+          suggested: status === 'mismatch' ? refAttack.bonus : undefined,
+        });
+      }
+
+      if (refAttack.damage && convAttack.damage) {
+        const refDpr = averageDamage(refAttack.damage);
+        const convDpr = averageDamage(convAttack.damage);
+        if (refDpr !== undefined && convDpr !== undefined) {
+          const status = compareNumeric(convDpr, refDpr);
+          diffs.push({
+            field: `attacks[${index}] damage`,
+            status,
+            converted: convAttack.damage,
+            reference: refAttack.damage,
+            suggested: status === 'mismatch' ? refAttack.damage : undefined,
+          });
+        }
+      }
     });
   }
 

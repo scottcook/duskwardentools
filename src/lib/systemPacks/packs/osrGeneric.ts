@@ -7,7 +7,8 @@
  */
 
 import { parseStatBlock } from '@/lib/parser';
-import type { ParsedCreatureData } from '@/types';
+import { convertCreature } from '@/lib/conversion/engine';
+import type { ParsedCreatureData, ConversionSettings, CreatureRole, ThreatTier, SourceSystem } from '@/types';
 import type {
   SystemPack,
   ConvertOptions,
@@ -15,7 +16,7 @@ import type {
   ReferenceStatblock,
   ValidationReport,
 } from '../types';
-import { buildConvertedStat, buildProvenance } from '../conversionUtils';
+import { buildProvenance } from '../conversionUtils';
 import { generateValidationReport } from '../validateUtils';
 
 export const osrGenericPack: SystemPack = {
@@ -28,8 +29,8 @@ export const osrGenericPack: SystemPack = {
   canAutoFindStatblocks: false,
   requiresUserReference: false,
 
-  parseSourceStatblock(inputText: string): ParsedCreatureData {
-    return parseStatBlock(inputText).data;
+  parseSourceStatblock(inputText: string, systemHint?: SourceSystem): ParsedCreatureData {
+    return parseStatBlock(inputText, systemHint).data;
   },
 
   convertToTarget(parsed: ParsedCreatureData, options: ConvertOptions): ConvertedStat {
@@ -38,15 +39,22 @@ export const osrGenericPack: SystemPack = {
       this.displayName,
       'Internal'
     );
-    return buildConvertedStat(
-      parsed, options,
-      /* hpMultiplier */  0.85,
-      /* dmgMultiplier */ 0.9,
-      /* showMorale */    true,
-      /* showReaction */  true,
-      'osr_generic',
-      provenance
-    );
+    const settings: ConversionSettings = {
+      deadliness: options.deadliness,
+      durability: options.durability,
+      targetLevel: options.targetLevel,
+      targetTier: options.targetTier as ThreatTier | undefined,
+      role: options.role as CreatureRole | undefined,
+      outputProfile: 'osr_generic',
+      outputPackId: 'osr_generic',
+      conversionProfileId: 'osr_generic_v1',
+    };
+    const converted = convertCreature(parsed, settings);
+    return {
+      ...converted,
+      outputPackId: 'osr_generic',
+      provenance,
+    };
   },
 
   validate(converted: ConvertedStat, reference?: ReferenceStatblock): ValidationReport {

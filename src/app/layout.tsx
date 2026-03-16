@@ -16,7 +16,7 @@ const unifrakturCook = UnifrakturCook({
 
 export const metadata: Metadata = {
   title: "Duskwarden | 5e/OSE to OSR Monster Converter",
-  description: "Paste any 5e or OSE monster and get a streamlined, table-ready stat card in seconds.",
+  description: "Convert 5e, OSE, B/X, and generic monster stat blocks into streamlined compatibility stat cards.",
 };
 
 export default function RootLayout({

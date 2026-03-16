@@ -147,6 +147,22 @@ describe('convertCreature', () => {
     const result = convertCreature(lowHp, settings);
     expect(result.hp).toBeGreaterThanOrEqual(1);
   });
+
+  it('should preserve multiattack structure when multiple source attacks exist', () => {
+    const settings = getDefaultSettings();
+    const multiattack: ParsedCreatureData = {
+      ...baseParsedData,
+      attacks: [
+        { name: 'Claw', bonus: 4, damage: '1d6+2' },
+        { name: 'Bite', bonus: 4, damage: '1d8+2' },
+      ],
+    };
+
+    const result = convertCreature(multiattack, settings);
+    expect(result.attacks).toHaveLength(2);
+    expect(result.attacks[0].name).toBe('Claw');
+    expect(result.attacks[1].name).toBe('Bite');
+  });
 });
 
 describe('getDefaultSettings', () => {

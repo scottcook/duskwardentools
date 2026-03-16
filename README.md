@@ -2,11 +2,11 @@
 
 roll for initiative
 
-A creature conversion workbench for tabletop RPG GMs. Paste stat blocks from any system, convert them to a generic format, and organize your campaign content.
+A creature conversion workbench for tabletop RPG GMs. Paste supported stat blocks, generate compatibility-focused conversions, and organize your campaign content.
 
 ## Features
 
-- **Creature Conversion**: Paste stat blocks from 5e, OSE, B/X, or other systems and convert them
+- **Creature Conversion**: Paste stat blocks from 5e, OSE, B/X, or other supported formats and convert them
 - **Adjustable Stats**: Deadliness and durability sliders for quick tuning
 - **Project Organization**: Group creatures and notes by campaign or adventure
 - **Library Search**: Full-text search across all your content
@@ -18,7 +18,7 @@ A creature conversion workbench for tabletop RPG GMs. Paste stat blocks from any
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS 4
 - **Database**: Supabase (PostgreSQL with RLS)
-- **Auth**: Supabase Auth (Magic Link)
+- **Data Access**: Device-scoped storage with Supabase + local fallback
 
 ## Getting Started
 
@@ -86,9 +86,9 @@ Duskwarden uses a **System Pack** architecture so conversions can be truly accur
 
 | Pack ID | Display Name | Data Source | License |
 |---|---|---|---|
-| `osr_generic` | OSR Generic | Heuristics | Internal |
-| `dnd5e_srd` | D&D 5e (SRD) | SRD 5.1 monster list | CC BY 4.0 |
-| `shadowdark_private_verify` | For use with Shadowdark RPG (verify) | User-provided reference text | UserProvided |
+| `osr_generic` | OSR Generic | Heuristic parser + OSR-target conversion | Internal |
+| `dnd5e_srd` | D&D 5e (SRD) | SRD 5.1 parsing enrichment, validation, and attribution | CC BY 4.0 |
+| `shadowdark_private_verify` | For use with Shadowdark RPG (verify) | Compatibility conversion + user-provided reference text | UserProvided |
 
 ### D&D 5e SRD — Ingesting Data
 
@@ -110,12 +110,12 @@ npm run ingest:srd -- --input /path/to/srd-monsters.json
 
 ### Shadowdark Verify Mode
 
-The `shadowdark_private_verify` pack ships zero proprietary Shadowdark content. Users paste the official stat block text from their own copy of the Shadowdark rules into a **Reference** textarea. The app:
+The `shadowdark_private_verify` pack ships zero proprietary Shadowdark content. Users paste the official stat block text from their own copy of the Shadowdark rules into a **Reference** textarea during the conversion review step. The app:
 
 1. Converts the source stat block using Shadowdark-tuned parameters
 2. Diffs the output against the user's reference field-by-field
 3. Shows an **Accuracy %** score and highlights mismatches
-4. Offers one-click "Apply Reference Values" to use the user's text as ground truth
+4. Highlights mismatches so the user can tune the result against their reference
 
 Reference text is stored only in the user's browser (`localStorage`) and is never transmitted to any server.
 
@@ -165,6 +165,14 @@ Before deploying to production, provide:
 - [ ] **SRD 5.1 monster JSON**: A structured JSON file of all SRD monsters (or confirm the seed list in `data/packs/dnd5e_srd/monsters.json` is sufficient). Run `npm run ingest:srd -- --input <path>` to replace the seed data.
 - [ ] **Supabase credentials**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` in `.env.local`.
 - [ ] **Shadowdark verify mode**: No data needed — users paste reference text they own at runtime.
+
+## Launch Positioning
+
+For launch copy, present Duskwarden as a **compatibility and conversion aid**, not an official rules reference.
+
+- Say `compatibility conversion`, `reference comparison`, or `review before play`.
+- Do not imply that generated output exactly matches official bestiary entries.
+- Keep Shadowdark messaging compatibility-only and independent.
 
 ---
 

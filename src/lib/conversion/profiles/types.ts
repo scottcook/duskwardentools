@@ -19,7 +19,7 @@ export interface TierTargets {
   acTarget: number;
   hpTarget: number;
   attackBonusTarget: number;
-  /** Average damage per round (single attack) */
+  /** Average damage per round across the creature's full attack routine */
   dprTarget: number;
   /** Optional morale (omit to hide the field) */
   moraleTarget?: number;

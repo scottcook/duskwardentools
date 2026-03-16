@@ -13,7 +13,8 @@
  */
 
 import { parseStatBlock } from '@/lib/parser';
-import type { ParsedCreatureData } from '@/types';
+import { convertCreature } from '@/lib/conversion/engine';
+import type { ParsedCreatureData, ConversionSettings, CreatureRole, ThreatTier, SourceSystem } from '@/types';
 import type {
   SystemPack,
   ConvertOptions,
@@ -21,7 +22,7 @@ import type {
   ReferenceStatblock,
   ValidationReport,
 } from '../types';
-import { buildConvertedStat, buildProvenance } from '../conversionUtils';
+import { buildProvenance } from '../conversionUtils';
 import { generateValidationReport } from '../validateUtils';
 
 export const shadowdarkVerifyPack: SystemPack = {
@@ -35,8 +36,8 @@ export const shadowdarkVerifyPack: SystemPack = {
   canAutoFindStatblocks: false,
   requiresUserReference: true,
 
-  parseSourceStatblock(inputText: string): ParsedCreatureData {
-    return parseStatBlock(inputText).data;
+  parseSourceStatblock(inputText: string, systemHint?: SourceSystem): ParsedCreatureData {
+    return parseStatBlock(inputText, systemHint).data;
   },
 
   convertToTarget(parsed: ParsedCreatureData, options: ConvertOptions): ConvertedStat {
@@ -45,31 +46,30 @@ export const shadowdarkVerifyPack: SystemPack = {
       this.displayName,
       'UserProvided'
     );
-    // Shadowdark-tuned parameters:
-    // - Lower HP (lean, fast-play)
-    // - Standard damage
-    // - No morale (not part of Shadowdark core)
-    // - No reaction roll
-    const converted = buildConvertedStat(
-      parsed, options,
-      /* hpMultiplier */  0.75,
-      /* dmgMultiplier */ 1.0,
-      /* showMorale */    false,
-      /* showReaction */  false,
-      'shadowdark_private_verify',
-      provenance
-    );
+    const settings: ConversionSettings = {
+      deadliness: options.deadliness,
+      durability: options.durability,
+      targetLevel: options.targetLevel,
+      targetTier: options.targetTier as ThreatTier | undefined,
+      role: options.role as CreatureRole | undefined,
+      outputProfile: 'shadowdark_compatible',
+      outputPackId: 'shadowdark_private_verify',
+      conversionProfileId: 'shadowdark_compatible_v1',
+    };
+    const converted = convertCreature(parsed, settings);
 
     // Override provenance disclaimer for Shadowdark mode
-    converted.provenance = {
-      ...converted.provenance,
-      disclaimer:
-        'Compatibility profile for use with Shadowdark RPG. ' +
-        'Duskwarden Tools is an independent production and is not affiliated with The Arcane Library, LLC. ' +
-        'This output does not reproduce Shadowdark RPG rules text.',
+    return {
+      ...converted,
+      outputPackId: 'shadowdark_private_verify',
+      provenance: {
+        ...provenance,
+        disclaimer:
+          'Compatibility profile for use with Shadowdark RPG. ' +
+          'Duskwarden Tools is an independent production and is not affiliated with The Arcane Library, LLC. ' +
+          'This output does not reproduce Shadowdark RPG rules text.',
+      },
     };
-
-    return converted;
   },
 
   validate(converted: ConvertedStat, reference?: ReferenceStatblock): ValidationReport {

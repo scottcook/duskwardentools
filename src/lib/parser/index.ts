@@ -11,42 +11,45 @@ export function parseStatBlock(
   text: string,
   systemHint?: SourceSystem
 ): ParserResult {
-  const warnings: string[] = [];
-  const data: ParsedCreatureData = {
-    system: systemHint,
-  };
-
   if (!text.trim()) {
-    return { success: false, data, confidence: 0, warnings: ['Empty text provided'] };
+    return {
+      success: false,
+      data: { system: systemHint },
+      confidence: 0,
+      warnings: ['Empty text provided'],
+    };
   }
 
-  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-  
-  if (lines.length > 0) {
-    data.name = extractName(lines[0]);
+  const lines = getLines(text);
+  const warnings: string[] = [];
+
+  let data: ParsedCreatureData;
+  switch (systemHint) {
+    case '5e':
+      data = parseModernStatBlock(text, lines, systemHint);
+      break;
+    case 'bx':
+    case 'ose':
+      data = parseOldSchoolStatBlock(text, lines, systemHint);
+      break;
+    default:
+      data = parseGenericStatBlock(text, lines, systemHint);
+      break;
   }
 
-  data.ac = extractAC(text);
+  data.system = systemHint ?? data.system ?? 'other';
+
   if (!data.ac) warnings.push('Could not extract AC');
-
-  data.hp = extractHP(text);
   if (!data.hp) warnings.push('Could not extract HP');
-
-  data.movement = extractMovement(text);
   if (!data.movement) {
     data.movement = '30 ft';
     warnings.push('Could not extract movement, using default');
   }
-
-  data.attacks = extractAttacks(text);
-  if (data.attacks.length === 0) warnings.push('Could not extract attacks');
-
-  data.cr = extractCR(text);
-  data.level = extractLevel(text, data.cr);
-
-  data.specialActions = extractSpecialActions(text);
-
-  data.saves = extractSaves(text);
+  if (!data.attacks || data.attacks.length === 0) {
+    data.attacks = [];
+    warnings.push('Could not extract attacks');
+  }
+  if (!data.specialActions) data.specialActions = [];
 
   const confidence = calculateConfidence(data);
 
@@ -58,6 +61,10 @@ export function parseStatBlock(
   };
 }
 
+function getLines(text: string): string[] {
+  return text.split('\n').map((line) => line.trim()).filter(Boolean);
+}
+
 function extractName(firstLine: string): string {
   return firstLine
     .replace(/^#+\s*/, '')
@@ -66,7 +73,7 @@ function extractName(firstLine: string): string {
     .trim() || 'Unknown Creature';
 }
 
-function extractAC(text: string): number | undefined {
+function extractModernAC(text: string): number | undefined {
   const patterns = [
     /AC\s*[:=]?\s*(\d+)/i,
     /Armor\s*Class\s*[:=]?\s*(\d+)/i,
@@ -85,7 +92,19 @@ function extractAC(text: string): number | undefined {
   return undefined;
 }
 
-function extractHP(text: string): number | undefined {
+function extractOldSchoolAC(text: string): number | undefined {
+  const match = text.match(/\b(?:AC|Armou?r\s*Class)\s*[:=]?\s*(-?\d+)(?:\s*\[\s*(\d+)\s*\])?/i);
+  if (!match) return undefined;
+
+  const descendingAc = parseInt(match[1], 10);
+  const ascendingAc = match[2] ? parseInt(match[2], 10) : undefined;
+
+  if (ascendingAc !== undefined) return ascendingAc;
+  if (descendingAc <= 9) return 19 - descendingAc;
+  return descendingAc;
+}
+
+function extractModernHP(text: string): number | undefined {
   const patterns = [
     /HP\s*[:=]?\s*(\d+)/i,
     /Hit\s*Points?\s*[:=]?\s*(\d+)/i,
@@ -111,18 +130,26 @@ function extractHP(text: string): number | undefined {
   return undefined;
 }
 
-function extractMovement(text: string): string | undefined {
+function normalizeMovement(value: string): string {
+  return value
+    .replace(/'/g, ' ft')
+    .replace(/\s+/g, ' ')
+    .replace(/\s*,\s*/g, ', ')
+    .trim();
+}
+
+function extractModernMovement(text: string): string | undefined {
   const patterns = [
-    /Speed\s*[:=]?\s*([\d\w\s,]+(?:ft\.?|feet|'))/i,
-    /Movement\s*[:=]?\s*([\d\w\s,]+(?:ft\.?|feet|'))/i,
-    /Move\s*[:=]?\s*(\d+(?:\s*(?:ft\.?|feet|'))?)/i,
-    /(\d+)\s*(?:ft\.?|feet|')\s*(?:speed|move|movement)/i,
+    /Speed\s*[:=]?\s*([^\n]+)/i,
+    /Movement\s*[:=]?\s*([^\n]+)/i,
+    /Move\s*[:=]?\s*([^\n]+)/i,
+    /(\d+\s*(?:ft\.?|feet|'))\s*(?:speed|move|movement)/i,
   ];
 
   for (const pattern of patterns) {
     const match = text.match(pattern);
     if (match) {
-      let movement = match[1].trim();
+      let movement = normalizeMovement(match[1].trim());
       if (/^\d+$/.test(movement)) {
         movement += ' ft';
       }
@@ -133,7 +160,12 @@ function extractMovement(text: string): string | undefined {
   return undefined;
 }
 
-function extractAttacks(text: string): Attack[] {
+function extractOldSchoolMovement(text: string): string | undefined {
+  const match = text.match(/\b(?:MV|Movement|Move)\s*[:=]?\s*([^\n]+)/i);
+  return match ? normalizeMovement(match[1]) : undefined;
+}
+
+function extractModernAttacks(text: string): Attack[] {
   const attacks: Attack[] = [];
   let match;
 
@@ -211,6 +243,115 @@ function extractAttacks(text: string): Attack[] {
   return attacks.slice(0, 5);
 }
 
+function extractTHAC0(text: string): { thac0?: number; attackBonus?: number } {
+  const match = text.match(/\bTHAC0\s*[:=]?\s*(\d+)(?:\s*\[\s*([+-]?\d+)\s*\])?/i);
+  if (!match) return {};
+
+  const thac0 = parseInt(match[1], 10);
+  const attackBonus = match[2] ? parseInt(match[2], 10) : 19 - thac0;
+  return { thac0, attackBonus };
+}
+
+function extractHitDice(text: string): { notation?: string; averageHp?: number } {
+  const match = text.match(/\b(?:HD|Hit\s*Dice)\s*[:=]?\s*(1\/2|½|\d+(?:[+-]\d+)?|\d+-\d+)(?:\*+)?(?:\s*\((\d+)\s*hp?\))?/i);
+  if (!match) return {};
+
+  return {
+    notation: match[1],
+    averageHp: match[2] ? parseInt(match[2], 10) : undefined,
+  };
+}
+
+function hitDiceToLevel(notation?: string): number | undefined {
+  if (!notation) return undefined;
+  if (notation === '1/2' || notation === '½') return 1;
+
+  const dice = parseInt(notation.split(/[+-]/)[0].split('-')[0], 10);
+  return Number.isNaN(dice) ? undefined : Math.max(1, dice);
+}
+
+function averageHpFromHitDice(notation?: string): number | undefined {
+  if (!notation) return undefined;
+  if (notation === '1/2' || notation === '½') return 2;
+
+  const baseMatch = notation.match(/^(\d+)/);
+  if (!baseMatch) return undefined;
+
+  const dice = parseInt(baseMatch[1], 10);
+  let modifier = 0;
+
+  if (notation.includes('+')) {
+    modifier = parseInt(notation.split('+')[1], 10);
+  } else if (notation.includes('-')) {
+    const parts = notation.split('-');
+    modifier = parts.length === 2 ? -parseInt(parts[1], 10) : 0;
+  }
+
+  return Math.max(1, Math.round(dice * 4.5 + modifier));
+}
+
+function deriveOldSchoolAttackBonus(hdNotation?: string): number | undefined {
+  if (!hdNotation) return undefined;
+  if (hdNotation === '1/2' || hdNotation === '½') return 0;
+
+  const base = parseInt(hdNotation.split(/[+-]/)[0].split('-')[0], 10);
+  if (Number.isNaN(base)) return undefined;
+
+  const hasPositiveMod = hdNotation.includes('+');
+  const effectiveHd = base + (hasPositiveMod ? 1 : 0);
+
+  if (effectiveHd <= 1) return 0;
+  if (effectiveHd <= 2) return 1;
+  if (effectiveHd <= 3) return 2;
+  if (effectiveHd <= 4) return 3;
+  if (effectiveHd <= 5) return 4;
+  if (effectiveHd <= 6) return 5;
+  if (effectiveHd <= 7) return 6;
+  if (effectiveHd <= 9) return 7;
+  if (effectiveHd <= 11) return 8;
+  if (effectiveHd <= 13) return 9;
+  if (effectiveHd <= 15) return 10;
+  if (effectiveHd <= 17) return 11;
+  if (effectiveHd <= 19) return 12;
+  if (effectiveHd <= 21) return 13;
+  return 14;
+}
+
+function normalizeAttackName(name: string): string {
+  return name
+    .replace(/\bweapon\b/i, 'Weapon')
+    .replace(/\battacks?\b/i, 'Attack')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/^\w/, (char) => char.toUpperCase());
+}
+
+function extractOldSchoolAttacks(text: string, attackBonus?: number): Attack[] {
+  const lineMatch = text.match(/\b(?:Attacks?|Att)\s*[:=]?\s*([^\n]+)/i);
+  if (!lineMatch) return [];
+
+  const line = lineMatch[1];
+  const attacks: Attack[] = [];
+  const attackPattern = /(?:(\d+)\s*(?:x|\u00d7)\s*)?([A-Za-z][A-Za-z\s/-]*)\s*\(([^)]+)\)/gi;
+  let match: RegExpExecArray | null;
+
+  while ((match = attackPattern.exec(line)) !== null) {
+    const count = match[1] ? parseInt(match[1], 10) : 1;
+    const name = normalizeAttackName(match[2]);
+    const damage = match[3].replace(/\s+/g, '');
+
+    for (let i = 0; i < count; i += 1) {
+      attacks.push({
+        name,
+        bonus: attackBonus,
+        damage,
+      });
+    }
+  }
+
+  return attacks.slice(0, 5);
+}
+
 function extractCR(text: string): string | undefined {
   const patterns = [
     /CR\s*[:=]?\s*(\d+(?:\/\d+)?)/i,
@@ -228,7 +369,7 @@ function extractCR(text: string): string | undefined {
   return undefined;
 }
 
-function extractLevel(text: string, cr?: string): number | undefined {
+function extractLevel(text: string, cr?: string, hdNotation?: string): number | undefined {
   if (cr) {
     if (cr.includes('/')) {
       const [num, denom] = cr.split('/').map(n => parseInt(n.trim(), 10));
@@ -253,40 +394,58 @@ function extractLevel(text: string, cr?: string): number | undefined {
     return parseInt(hdMatch[1], 10);
   }
 
+  const hdLevel = hitDiceToLevel(hdNotation);
+  if (hdLevel !== undefined) return hdLevel;
+
   return undefined;
+}
+
+function isSectionHeader(line: string): boolean {
+  return /^(actions|reactions|bonus actions|legendary actions|lair actions|traits?)$/i.test(line);
+}
+
+function isActionLikeLine(line: string): boolean {
+  return /^[A-Z][A-Za-z' -]{1,40}[.:]\s+.+/.test(line);
 }
 
 function extractSpecialActions(text: string): SpecialAction[] {
   const actions: SpecialAction[] = [];
 
-  const actionPatterns = [
-    /\*\*([^*]+)\*\*\s*(?:\(([^)]+)\))?\s*[.:]?\s*([^*\n]+(?:\n(?![*\n])[^\n]+)*)/g,
-    /^([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s*(?:\(([^)]+)\))?[.:]?\s+(.+)$/gm,
-  ];
+  let section: 'traits' | 'actions' | 'reactions' | 'other' = 'traits';
 
-  const rechargePattern = /Recharge\s*(\d+[-–]\d+|\d+)/i;
+  for (const line of getLines(text)) {
+    if (isSectionHeader(line)) {
+      if (/^actions$/i.test(line)) section = 'actions';
+      else if (/^reactions$/i.test(line)) section = 'reactions';
+      else section = 'other';
+      continue;
+    }
 
-  for (const pattern of actionPatterns) {
-    let match;
-    while ((match = pattern.exec(text)) !== null) {
-      const name = match[1]?.trim();
-      const parenthetical = match[2]?.trim();
-      const description = match[3]?.trim();
+    if (!isActionLikeLine(line)) continue;
 
-      if (!name || name.length > 50) continue;
-      if (isCommonHeader(name)) continue;
+    const match = line.match(/^([A-Z][A-Za-z' -]{1,40})[.:]\s+(.+)$/);
+    if (!match) continue;
 
-      const rechargeMatch = parenthetical?.match(rechargePattern) || description?.match(rechargePattern);
+    const name = match[1].trim();
+    const description = match[2].trim();
 
-      actions.push({
-        name,
-        description: description || '',
-        recharge: rechargeMatch ? `Recharge ${rechargeMatch[1]}` : undefined,
-      });
+    if (isCommonHeader(name)) continue;
+    if (/^(?:save|saves|saving throws?|save as|armor class|armour class|hit dice|movement|move|morale|thac0)$/i.test(name)) continue;
+    if (/(?:attack:|\+\d+\s*to\s*hit)/i.test(description) && section === 'actions') continue;
+
+    const rechargeMatch = description.match(/Recharge\s*(\d+[-–]\d+|\d+)/i);
+    actions.push({
+      name,
+      description,
+      recharge: rechargeMatch ? `Recharge ${rechargeMatch[1]}` : undefined,
+    });
+
+    if (actions.length >= 5) {
+      break;
     }
   }
 
-  return actions.slice(0, 5);
+  return actions;
 }
 
 function isCommonHeader(text: string): boolean {
@@ -299,19 +458,109 @@ function isCommonHeader(text: string): boolean {
 }
 
 function extractSaves(text: string): string | undefined {
-  const savePatterns = [
-    /Saving\s*Throws?\s*[:=]?\s*([A-Za-z\s+,\d-]+)/i,
-    /Saves?\s*[:=]?\s*([A-Za-z\s+,\d-]+)/i,
-  ];
+  let match = text.match(/(?:^|[\n,;])\s*SV\s*[:=]?\s*([^\n,;]+)/i);
+  if (match) return match[1].trim().slice(0, 100);
 
-  for (const pattern of savePatterns) {
-    const match = text.match(pattern);
-    if (match) {
-      return match[1].trim().slice(0, 100);
-    }
+  match = text.match(/(?:^|\n)\s*Saving\s*Throws?\s*[:=]?\s*([^\n]+)/i);
+  if (match) return match[1].trim().slice(0, 100);
+
+  match = text.match(/(?:^|[\n,;])\s*Save\s+As\b\s*:?\s*([^\n,;]+)/i);
+  if (match) {
+    const value = match[1].trim().slice(0, 100);
+    return value ? `Save As ${value}` : 'Save As';
   }
 
+  match = text.match(/(?:^|\n)\s*Saves?\s*[:=]?\s*([A-Za-z0-9+,\s-]+)$/im);
+  if (match) return match[1].trim().slice(0, 100);
+
   return undefined;
+}
+
+function extractMorale(text: string): number | undefined {
+  const match = text.match(/\b(?:ML|Morale)\s*[:=]?\s*(\d+)/i);
+  return match ? parseInt(match[1], 10) : undefined;
+}
+
+function parseModernStatBlock(
+  text: string,
+  lines: string[],
+  systemHint?: SourceSystem,
+): ParsedCreatureData {
+  const data: ParsedCreatureData = {
+    system: systemHint,
+    name: lines.length > 0 ? extractName(lines[0]) : undefined,
+    ac: extractModernAC(text),
+    hp: extractModernHP(text),
+    movement: extractModernMovement(text),
+    attacks: extractModernAttacks(text),
+    cr: extractCR(text),
+    saves: extractSaves(text),
+    specialActions: extractSpecialActions(text),
+  };
+
+  data.level = extractLevel(text, data.cr);
+  return data;
+}
+
+function parseOldSchoolStatBlock(
+  text: string,
+  lines: string[],
+  systemHint?: SourceSystem,
+): ParsedCreatureData {
+  const hitDice = extractHitDice(text);
+  const thac0 = extractTHAC0(text);
+  const derivedAttackBonus = thac0.attackBonus ?? deriveOldSchoolAttackBonus(hitDice.notation);
+
+  const data: ParsedCreatureData = {
+    system: systemHint,
+    name: lines.length > 0 ? extractName(lines[0]) : undefined,
+    ac: extractOldSchoolAC(text) ?? extractModernAC(text),
+    hp: hitDice.averageHp ?? averageHpFromHitDice(hitDice.notation) ?? extractModernHP(text),
+    movement: extractOldSchoolMovement(text) ?? extractModernMovement(text),
+    attacks: extractOldSchoolAttacks(text, derivedAttackBonus),
+    saves: extractSaves(text),
+    specialActions: extractSpecialActions(text),
+    level: extractLevel(text, extractCR(text), hitDice.notation),
+    morale: extractMorale(text),
+    thac0: thac0.thac0,
+  };
+
+  if (!data.attacks?.length) {
+    data.attacks = extractModernAttacks(text);
+  }
+
+  return data;
+}
+
+function fillMissing<T extends object>(target: T, source: Partial<T>): T {
+  const next = { ...target };
+  for (const [key, value] of Object.entries(source) as Array<[keyof T, T[keyof T]]>) {
+    const current = next[key];
+    if (
+      current === undefined ||
+      current === '' ||
+      (Array.isArray(current) && current.length === 0)
+    ) {
+      next[key] = value;
+    }
+  }
+  return next;
+}
+
+function parseGenericStatBlock(
+  text: string,
+  lines: string[],
+  systemHint?: SourceSystem,
+): ParsedCreatureData {
+  const looksOldSchool = /\b(?:HD|MV|THAC0|ML|SV|Att)\b/i.test(text);
+  const primary = looksOldSchool
+    ? parseOldSchoolStatBlock(text, lines, systemHint)
+    : parseModernStatBlock(text, lines, systemHint);
+  const fallback = looksOldSchool
+    ? parseModernStatBlock(text, lines, systemHint)
+    : parseOldSchoolStatBlock(text, lines, systemHint);
+
+  return fillMissing(primary, fallback);
 }
 
 function calculateConfidence(data: ParsedCreatureData): number {
@@ -342,6 +591,8 @@ export function createEmptyParsedData(): ParsedCreatureData {
     specialActions: [],
     cr: undefined,
     level: undefined,
+    morale: undefined,
+    thac0: undefined,
     system: 'other',
   };
 }

@@ -250,4 +250,19 @@ describe('generateValidationReport', () => {
     expect(report.accuracyScore).toBeGreaterThanOrEqual(0);
     expect(report.accuracyScore).toBeLessThanOrEqual(100);
   });
+
+  it('reports total DPR and per-attack diffs for reference attacks', () => {
+    const ref: ReferenceStatblock = {
+      rawText: 'Goblin\nAC 15\nHP 7',
+      parsed: {
+        name: 'Goblin',
+        ac: 15,
+        hp: 7,
+        attacks: [{ name: 'Scimitar', bonus: 4, damage: '2d6+2' }],
+      },
+    };
+    const report = generateValidationReport(mockConverted, ref);
+    expect(report.diffs.some(d => d.field === 'attacks (total DPR)')).toBe(true);
+    expect(report.diffs.some(d => d.field === 'attacks[0] damage')).toBe(true);
+  });
 });

@@ -116,7 +116,7 @@ export function BandValidationPanel({ report, tuning, settings, onSettingsChange
           )}
         </div>
 
-        {/* Balanced badge — amber advisory tone for non-balanced */}
+        {/* Profile-band badge — advisory, not canonical */}
         {report.results.length > 0 && (
           <span
             className={`shrink-0 px-2 py-1 rounded text-xs font-semibold border ${
@@ -125,7 +125,7 @@ export function BandValidationPanel({ report, tuning, settings, onSettingsChange
                 : 'border-amber-400/40 bg-amber-400/10 text-amber-500'
             }`}
           >
-            {report.balanced ? '✓ Balanced' : 'Review suggested'}
+            {report.balanced ? '✓ Within profile bands' : 'Review suggested'}
           </span>
         )}
       </div>
@@ -270,8 +270,8 @@ export function BandValidationPanel({ report, tuning, settings, onSettingsChange
       )}
 
       <p className="text-xs text-text-muted border-t border-border/30 pt-3 leading-snug">
-        &ldquo;Balanced&rdquo; means within Duskwarden&apos;s target bands for this profile.
-        It does not mean this matches any official published stat block.
+        &ldquo;Within profile bands&rdquo; means the output lands inside Duskwarden&apos;s tuning targets for this profile.
+        It does not mean the result matches any official published stat block.
       </p>
     </div>
   );

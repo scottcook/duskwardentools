@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Button, Textarea, Select, Input } from '@/components/ui';
 import { CONVERSION_PROFILE_OPTIONS } from '@/lib/conversion/profiles';
-import type { SourceSystem, CreatureRole } from '@/types';
+import type { SourceSystem, CreatureRole, DetectionConfidence } from '@/types';
 import type { ConversionProfileId } from '@/lib/conversion/profiles';
 
 const EXAMPLE_STATBLOCK = `Goblin
@@ -17,11 +17,17 @@ CR 1/4`;
 interface Step1SourceProps {
   sourceText: string;
   sourceSystem: SourceSystem;
+  detectedSourceSystem?: SourceSystem;
+  detectedSourceSystemConfidence?: DetectionConfidence;
+  hasManualSourceSystemSelection: boolean;
   conversionProfileId: ConversionProfileId;
+  creatureName: string;
   metadata: { intendedLevel?: number; role?: CreatureRole };
+  isValid?: boolean;
   onSourceChange: (text: string) => void;
   onSystemChange: (system: SourceSystem) => void;
   onProfileChange: (profileId: ConversionProfileId) => void;
+  onCreatureNameChange: (name: string) => void;
   onMetadataChange: (key: 'intendedLevel' | 'role', value: number | CreatureRole | undefined) => void;
   onNext: () => void;
 }
@@ -31,6 +37,22 @@ const SOURCE_SYSTEM_OPTIONS = [
   { value: 'bx', label: 'B/X D&D' },
   { value: 'ose', label: 'OSE' },
   { value: 'other', label: 'Other / Generic' },
+];
+
+const SOURCE_SYSTEM_LABELS: Record<SourceSystem, string> = {
+  '5e': '5e / 5.5e',
+  bx: 'B/X D&D',
+  ose: 'OSE',
+  other: 'Other / Generic',
+};
+
+const THREAT_TIER_OPTIONS = [
+  { value: '', label: 'Auto-detect from CR/HD' },
+  { value: '1', label: 'Tier 1 — Trivial' },
+  { value: '2', label: 'Tier 2 — Easy' },
+  { value: '3', label: 'Tier 3 — Moderate' },
+  { value: '4', label: 'Tier 4 — Hard' },
+  { value: '5', label: 'Tier 5 — Deadly' },
 ];
 
 const ROLE_OPTIONS = [
@@ -59,30 +81,52 @@ const PROFILE_HELPER: Record<ConversionProfileId, { note: string; compat?: strin
 export function Step1Source({
   sourceText,
   sourceSystem,
+  detectedSourceSystem,
+  detectedSourceSystemConfidence,
+  hasManualSourceSystemSelection,
   conversionProfileId,
+  creatureName,
   metadata,
+  isValid,
   onSourceChange,
   onSystemChange,
   onProfileChange,
+  onCreatureNameChange,
   onMetadataChange,
   onNext,
 }: Step1SourceProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showExample, setShowExample] = useState(false);
 
-  const canProceed = sourceText.trim().length > 10;
+  const canProceed = sourceText.trim().length > 10 && isValid !== false;
   const selectedHelper = PROFILE_HELPER[conversionProfileId];
+  const detectionMatches = detectedSourceSystem === sourceSystem;
+  const showDetection = Boolean(detectedSourceSystem) && sourceText.trim().length >= 10;
+  const confidenceTone =
+    detectedSourceSystemConfidence === 'high' ? 'text-success' :
+    detectedSourceSystemConfidence === 'medium' ? 'text-accent' :
+    'text-text-muted';
 
   return (
     <div className="space-y-6">
-      {/* Step heading */}
-      <div>
-        <h2 className="text-lg font-semibold text-text-primary mb-1">
-          Step 1: Create a Duskwarden Stat Card
-        </h2>
-        <p className="text-sm text-text-muted">
-          Choose an output system profile to tune balance and formatting.
-        </p>
+      {/* Step heading + profile compatibility note */}
+      <div className="grid gap-3 sm:grid-cols-[minmax(0,1.7fr)_minmax(0,1.3fr)] items-start">
+        <div>
+          <h2 className="text-lg font-semibold text-text-primary mb-1">
+            Step 1: Create a Duskwarden Stat Card
+          </h2>
+          <p className="text-sm text-text-muted">
+            Choose an output system profile to tune balance and formatting.
+          </p>
+        </div>
+        {selectedHelper?.compat && (
+          <p
+            role="note"
+            className="mt-0 px-3 py-2 rounded border border-accent/30 bg-accent/5 text-xs text-text-secondary leading-snug sm:justify-self-end max-w-md"
+          >
+            {selectedHelper.compat}
+          </p>
+        )}
       </div>
 
       {/* ── System row: Source + Output side-by-side ─────── */}
@@ -95,6 +139,36 @@ export function Step1Source({
             onChange={(e) => onSystemChange(e.target.value as SourceSystem)}
             hint="Helps the parser understand the input format"
           />
+          {showDetection && (
+            <div className="mt-2 rounded-lg border border-border bg-bg-elevated px-3 py-2 text-xs leading-snug">
+              <p className="text-text-secondary">
+                Detected from pasted text:{' '}
+                <span className="font-medium">{SOURCE_SYSTEM_LABELS[detectedSourceSystem!]}</span>{' '}
+                <span className={confidenceTone}>({detectedSourceSystemConfidence} confidence)</span>
+              </p>
+              {detectionMatches ? (
+                <p className="mt-1 text-text-muted">
+                  {hasManualSourceSystemSelection
+                    ? 'Using your selected source system.'
+                    : 'Using the detected source system automatically until you choose one manually.'}
+                </p>
+              ) : (
+                <div className="mt-1 flex items-center justify-between gap-3 flex-wrap">
+                  <p className="text-text-muted">
+                    This stat block looks like {SOURCE_SYSTEM_LABELS[detectedSourceSystem!]}, but the selector is set to {SOURCE_SYSTEM_LABELS[sourceSystem]}.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onSystemChange(detectedSourceSystem!)}
+                  >
+                    Use detected system
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
         <div>
           <Select
@@ -109,16 +183,17 @@ export function Step1Source({
               {selectedHelper.note}
             </p>
           )}
-          {selectedHelper?.compat && (
-            <p
-              role="note"
-              className="mt-2 px-3 py-2 rounded border border-accent/30 bg-accent/5 text-xs text-text-secondary leading-snug"
-            >
-              {selectedHelper.compat}
-            </p>
-          )}
         </div>
       </div>
+
+      {/* ── Creature name ────────────────────────────────── */}
+      <Input
+        label="Creature Name"
+        placeholder="e.g. Goblin, Shadow Drake, Cave Troll"
+        value={creatureName}
+        onChange={(e) => onCreatureNameChange(e.target.value)}
+        hint="Leave blank to auto-detect from the stat block."
+      />
 
       {/* ── Source stat block textarea ────────────────────── */}
       <div>
@@ -199,21 +274,15 @@ export function Step1Source({
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Input
+                <Select
                   label="Threat Tier"
-                  type="number"
-                  min={1}
-                  max={5}
-                  value={metadata.intendedLevel ?? ''}
+                  options={THREAT_TIER_OPTIONS}
+                  value={metadata.intendedLevel != null ? String(metadata.intendedLevel) : ''}
                   onChange={(e) =>
                     onMetadataChange('intendedLevel', e.target.value ? parseInt(e.target.value, 10) : undefined)
                   }
-                  placeholder="Auto-detect (1–5)"
-                  aria-describedby="tier-hint"
+                  hint="Drives HP, AC, and damage targets. Leave blank to auto-detect from CR/HD."
                 />
-                <p id="tier-hint" className="mt-1.5 text-xs text-text-muted">
-                  Drives HP, AC, and damage targets. Leave blank to auto-detect from CR/HD.
-                </p>
               </div>
               <div>
                 <Select
@@ -235,7 +304,11 @@ export function Step1Source({
 
       {!canProceed && sourceText.trim().length > 0 && (
         <div className="rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-sm text-warning">
-          <p className="font-medium">Please enter at least 10 characters of stat block text to continue.</p>
+          {sourceText.trim().length <= 10 ? (
+            <p className="font-medium">Please enter at least 10 characters of stat block text to continue.</p>
+          ) : isValid === false ? (
+            <p className="font-medium">⚠️ We couldn&apos;t detect any recognizable monster stats (like AC, HP, or attacks). Please paste a valid stat block.</p>
+          ) : null}
         </div>
       )}
 
@@ -248,7 +321,7 @@ export function Step1Source({
         </Button>
         {!canProceed && (
           <span id="parse-error" className="sr-only">
-            Cannot proceed: stat block text must be at least 10 characters
+            {sourceText.trim().length <= 10 ? "Cannot proceed: stat block text must be at least 10 characters" : "Cannot proceed: no recognizable stats detected"}
           </span>
         )}
       </div>

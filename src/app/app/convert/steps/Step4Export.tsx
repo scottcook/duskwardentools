@@ -131,7 +131,7 @@ export function Step4Export({
         </p>
         {pack && (
           <p className="mt-2 text-xs text-text-muted">
-            Output System: <span className="text-text-secondary font-medium">{pack.displayName}</span>
+            Attribution Pack: <span className="text-text-secondary font-medium">{pack.displayName}</span>
             {pack.license.type === 'CC-BY-4.0' && (
               <span className="ml-2 px-1.5 py-0.5 rounded border border-success/40 bg-success/10 text-success text-xs">CC BY 4.0</span>
             )}
