@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Button, Textarea } from '@/components/ui';
+import { Button } from '@/components/ui';
 import { CreatureCard } from '@/components/features/CreatureCard';
 import { SYSTEM_PACKS } from '@/lib/systemPacks';
 import type { OutputCreatureData } from '@/types';
@@ -13,22 +13,6 @@ interface Step4ExportProps {
   onGoToLibrary: () => void;
 }
 
-function buildAttributionTemplate(outputData: OutputCreatureData): string {
-  const prov = outputData.provenance;
-  const lines = [
-    '[Your Product Name] uses content converted via Duskwarden Tools.',
-    '',
-    'Duskwarden Tools is an independent production and is not affiliated with The Arcane Library, LLC.',
-  ];
-  if (prov?.licenseType === 'CC-BY-4.0' && prov.attributionText) {
-    lines.push('', 'Data attribution:', prov.attributionText);
-  }
-  if (outputData.outputPackId === 'shadowdark_private_verify') {
-    lines.push('', 'If your product uses Shadowdark RPG content, you must include appropriate attribution per the Shadowdark RPG Third-Party License.');
-  }
-  return lines.join('\n');
-}
-
 export function Step4Export({
   outputData,
   title,
@@ -36,7 +20,6 @@ export function Step4Export({
   onGoToLibrary,
 }: Step4ExportProps) {
   const [copied, setCopied] = useState<string | null>(null);
-  const [attribution, setAttribution] = useState(() => buildAttributionTemplate(outputData));
 
   const pack = outputData.outputPackId ? SYSTEM_PACKS[outputData.outputPackId] : null;
 
@@ -189,44 +172,6 @@ export function Step4Export({
             </Button>
           </div>
 
-          {/* Attribution Template — Elevated callout */}
-          <div className="pt-4">
-            <div className="rounded-lg border border-accent/30 bg-accent/5 p-4 space-y-3">
-              <div className="flex items-start gap-3">
-                <div className="shrink-0 w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center">
-                  <svg className="w-4 h-4 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="font-semibold text-text-primary mb-1">Attribution Template</h3>
-                  <p className="text-xs text-text-muted leading-relaxed">
-                    If you&apos;re publishing content that includes converted creatures (in a game supplement, blog post, or product), 
-                    proper attribution builds trust with your audience and respects the original content creators.
-                    Copy and customize this template:
-                  </p>
-                </div>
-              </div>
-              <Textarea
-                value={attribution}
-                onChange={(e) => setAttribution(e.target.value)}
-                rows={4}
-                className="text-sm bg-bg-base"
-              />
-              <div className="flex items-center justify-between">
-                <p className="text-xs text-text-muted">
-                  Edit as needed for your project.
-                </p>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => copyToClipboard(attribution, 'attribution')}
-                >
-                  {copied === 'attribution' ? '✓ Copied!' : 'Copy Attribution'}
-                </Button>
-              </div>
-            </div>
-          </div>
         </div>
 
         <div>
