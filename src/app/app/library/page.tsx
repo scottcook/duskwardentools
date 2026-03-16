@@ -228,7 +228,13 @@ function LibraryPageContent() {
                       {projects.length > 0 && (
                         <div onClick={(e) => e.preventDefault()}>
                           <select
-                            className="w-full text-xs bg-bg-elevated border border-border rounded px-2 py-1.5 text-text-secondary focus:outline-none focus:ring-1 focus:ring-accent cursor-pointer hover:border-accent/50 transition-colors"
+                            className="w-full text-xs bg-bg-elevated border border-border rounded px-2 py-1.5 pr-7 text-text-secondary appearance-none focus:outline-none focus:ring-1 focus:ring-accent cursor-pointer hover:border-accent/50 transition-colors"
+                            style={{
+                              backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23a3a3a3' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
+                              backgroundPosition: 'right 0.375rem center',
+                              backgroundRepeat: 'no-repeat',
+                              backgroundSize: '1.125em 1.125em',
+                            }}
                             value={entry.project_id || ""}
                             onChange={(e) => {
                               void assignEntryToProject(entry.id, e.target.value || null);
@@ -263,27 +269,28 @@ function LibraryPageContent() {
           <div className="hidden sm:block w-px h-4 bg-border" />
           
           {projects.length > 0 && (
-            <div className="flex items-center">
-              <select
-                className="text-sm font-medium text-text-secondary bg-transparent border-none focus:outline-none focus:ring-0 cursor-pointer appearance-none hover:text-text-primary transition-colors"
-                value=""
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (val) {
-                    void handleBulkProjectMove(val === 'none' ? null : val);
-                  }
-                }}
-              >
-                <option value="" disabled>Move to project...</option>
-                <option value="none">Remove from project</option>
-                {projects.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-              <svg className="w-4 h-4 text-text-muted pointer-events-none -ml-1 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </div>
+            <select
+              className="text-sm font-medium text-text-secondary bg-transparent border-none focus:outline-none focus:ring-0 cursor-pointer appearance-none hover:text-text-primary transition-colors pr-5"
+              style={{
+                backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23a3a3a3' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
+                backgroundPosition: 'right 0 center',
+                backgroundRepeat: 'no-repeat',
+                backgroundSize: '1.25em 1.25em',
+              }}
+              value=""
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val) {
+                  void handleBulkProjectMove(val === 'none' ? null : val);
+                }
+              }}
+            >
+              <option value="" disabled>Move to project...</option>
+              <option value="none">Remove from project</option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
           )}
 
           <div className="hidden sm:block w-px h-4 bg-border" />
