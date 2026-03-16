@@ -9,6 +9,7 @@ import type { Project, Entry } from '@/types';
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<(Project & { entryCount: number })[]>([]);
+  const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
 
   const triggerRefresh = useCallback(() => {
@@ -27,6 +28,7 @@ export default function ProjectsPage() {
       setProjects(projectsWithCounts.sort((a, b) =>
         new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
       ));
+      setLoading(false);
     })();
     return () => { cancelled = true; };
   }, [refreshKey]);
@@ -41,7 +43,21 @@ export default function ProjectsPage() {
         <CreateProjectButton onCreated={triggerRefresh} />
       </div>
 
-      {projects.length === 0 ? (
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-pulse">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="bg-bg-surface border border-border rounded-lg p-6 space-y-3">
+              <div className="h-5 w-32 bg-bg-elevated rounded" />
+              <div className="h-4 w-full bg-bg-elevated/40 rounded" />
+              <div className="h-4 w-2/3 bg-bg-elevated/30 rounded" />
+              <div className="flex items-center justify-between pt-2">
+                <div className="h-3 w-16 bg-bg-elevated/40 rounded" />
+                <div className="h-3 w-20 bg-bg-elevated/40 rounded" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : projects.length === 0 ? (
         <Card>
           <CardContent className="text-center py-12">
             <svg className="w-12 h-12 mx-auto text-text-muted mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

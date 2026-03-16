@@ -2,19 +2,21 @@
 
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { useState, useEffect } from 'react';
-import { Badge, Card, CardContent, ThreatBadge } from '@/components/ui';
+import { useState, useEffect, useCallback } from 'react';
+import { Badge, Card, CardContent, ThreatBadge, useToast } from '@/components/ui';
 import { EntryActions } from './EntryActions';
-import { CreatureCard } from '@/components/features/CreatureCard';
-import { getEntry, getProject } from '@/lib/storage';
+import { EditableCreatureCard } from '@/components/features/EditableCreatureCard';
+import { getEntry, getProject, updateEntry } from '@/lib/storage';
 import type { Entry, Project, OutputCreatureData, ThreatTier } from '@/types';
 
 export default function EntryDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const { addToast } = useToast();
   const [entry, setEntry] = useState<Entry | null>(null);
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     const id = params.id as string;
@@ -32,6 +34,24 @@ export default function EntryDetailPage() {
       setLoading(false);
     })();
   }, [params.id, router]);
+
+  const handleSaveCreatureData = useCallback(async (updatedData: OutputCreatureData) => {
+    if (!entry) return;
+    setSaving(true);
+    try {
+      const updated = await updateEntry(entry.id, {
+        output_json: updatedData,
+        title: updatedData.name,
+      });
+      if (!updated) throw new Error('Save failed');
+      setEntry(updated);
+      addToast('success', 'Creature stats saved');
+    } catch {
+      addToast('error', 'Could not save changes');
+    } finally {
+      setSaving(false);
+    }
+  }, [entry, addToast]);
 
   if (loading || !entry) {
     return (
@@ -83,7 +103,7 @@ export default function EntryDetailPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div>
             <h2 className="text-lg font-semibold text-text-primary mb-4">Converted Stat Block</h2>
-            <CreatureCard data={outputData} />
+            <EditableCreatureCard data={outputData} onSave={handleSaveCreatureData} saving={saving} />
           </div>
 
           <div className="space-y-6">

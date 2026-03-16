@@ -160,6 +160,8 @@ export interface OutputCreatureData {
   provenance?: ProvenanceBlock;
   /** Tuning metadata — target bands, role, multipliers */
   tuning?: ConversionTuning;
+  /** Set to true when a user has manually edited the converted output */
+  manuallyEdited?: boolean;
 }
 
 export interface Entry {

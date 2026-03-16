@@ -13,14 +13,16 @@ function LibraryPageContent() {
 
   const [entries, setEntries] = useState<Entry[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState(searchParams.get('q') || '');
   const [typeFilter, setTypeFilter] = useState(searchParams.get('type') || '');
   const [projectFilter, setProjectFilter] = useState(searchParams.get('project') || '');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    getEntries().then(setEntries);
-    getProjects().then(setProjects);
+    Promise.all([getEntries(), getProjects()])
+      .then(([e, p]) => { setEntries(e); setProjects(p); })
+      .finally(() => setLoading(false));
   }, []);
 
   const filteredEntries = useMemo(() => {
@@ -163,7 +165,23 @@ function LibraryPageContent() {
         </div>
       </div>
 
-      {filteredEntries.length === 0 ? (
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 animate-pulse">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="bg-bg-surface border border-border rounded-lg p-6 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="h-5 w-28 bg-bg-elevated rounded" />
+                <div className="h-5 w-16 bg-bg-elevated/60 rounded-full" />
+              </div>
+              <div className="h-4 w-full bg-bg-elevated/40 rounded" />
+              <div className="h-4 w-3/4 bg-bg-elevated/30 rounded" />
+              <div className="pt-2">
+                <div className="h-3 w-24 bg-bg-elevated/40 rounded" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : filteredEntries.length === 0 ? (
         <Card>
           <div className="text-center py-12">
             <p className="text-text-muted">No entries found.</p>
