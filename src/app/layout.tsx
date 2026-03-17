@@ -1,9 +1,10 @@
-import type { Metadata } from "next";
-import { Montserrat, UnifrakturCook } from "next/font/google";
-import { Analytics } from "@vercel/analytics/react";
-import { SpeedInsights } from "@vercel/speed-insights/next";
-import { NewsletterModal } from "@/components/features/NewsletterModal";
-import "./globals.css";
+import type { Metadata } from 'next';
+import { Montserrat, UnifrakturCook } from 'next/font/google';
+import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/next';
+import { NewsletterModal } from '@/components/features/NewsletterModal';
+import { siteConfig } from '@/lib/seo';
+import './globals.css';
 
 const montserrat = Montserrat({
   variable: "--font-montserrat",
@@ -17,32 +18,38 @@ const unifrakturCook = UnifrakturCook({
   weight: "700",
 });
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://duskwarden.vercel.app';
-
 export const metadata: Metadata = {
-  metadataBase: new URL(siteUrl),
-  title: "Duskwarden | 5e/OSE to OSR Monster Converter",
-  description: "Convert 5e, OSE, B/X, and generic monster stat blocks into streamlined compatibility stat cards.",
+  metadataBase: new URL(siteConfig.url),
+  title: {
+    default: siteConfig.defaultTitle,
+    template: `%s | ${siteConfig.shortName}`,
+  },
+  description: siteConfig.defaultDescription,
+  applicationName: siteConfig.name,
+  category: 'games',
+  alternates: {
+    canonical: '/',
+  },
   openGraph: {
-    title: "Duskwarden | 5e/OSE to OSR Monster Converter",
-    description: "Convert 5e, OSE, B/X, and generic monster stat blocks into streamlined compatibility stat cards.",
+    title: siteConfig.defaultTitle,
+    description: siteConfig.defaultDescription,
     url: "/",
-    siteName: "Duskwarden Tools",
+    siteName: siteConfig.name,
     images: [
       {
-        url: "/og-image.jpg",
+        url: siteConfig.ogImage,
         width: 1024,
         height: 537,
-        alt: "Duskwarden Tools — 5e/OSE to OSR Monster Converter",
+        alt: 'Duskwarden Tools — Monster Stat Block Converter',
       },
     ],
     type: "website",
   },
   twitter: {
-    card: "summary_large_image",
-    title: "Duskwarden | 5e/OSE to OSR Monster Converter",
-    description: "Convert 5e, OSE, B/X, and generic monster stat blocks into streamlined compatibility stat cards.",
-    images: ["/og-image.jpg"],
+    card: 'summary_large_image',
+    title: siteConfig.defaultTitle,
+    description: siteConfig.defaultDescription,
+    images: [siteConfig.ogImage],
   },
 };
 
