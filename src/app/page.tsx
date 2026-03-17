@@ -80,6 +80,14 @@ export default function LandingPage() {
           <p className="mt-1 text-center text-xs text-text-muted">
             Conversion output uses Duskwarden compatibility heuristics and should be reviewed before publication or play.
           </p>
+          <p className="mt-2 text-center text-xs text-text-muted">
+            <a
+              href="mailto:duskwardentools@gmail.com?subject=Duskwarden%20Feedback"
+              className="text-accent hover:text-accent-hover transition-colors underline underline-offset-2"
+            >
+              Feedback
+            </a>
+          </p>
         </div>
       </footer>
     </div>

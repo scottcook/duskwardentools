@@ -165,6 +165,7 @@ Before deploying to production, provide:
 - [ ] **SRD 5.1 monster JSON**: A structured JSON file of all SRD monsters (or confirm the seed list in `data/packs/dnd5e_srd/monsters.json` is sufficient). Run `npm run ingest:srd -- --input <path>` to replace the seed data.
 - [ ] **Supabase credentials**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` in `.env.local`.
 - [ ] **Shadowdark verify mode**: No data needed — users paste reference text they own at runtime.
+- [ ] **Newsletter signup (optional)**: Create a form at [Formspree](https://formspree.io) with destination `duskwardentools@gmail.com`, then set `NEXT_PUBLIC_FORMSPREE_NEWSLETTER_ID` to the form ID. If unset, the modal falls back to a `mailto:` link.
 
 ## Launch Positioning
 

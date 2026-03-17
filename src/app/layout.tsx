@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Montserrat, UnifrakturCook } from "next/font/google";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { NewsletterModal } from "@/components/features/NewsletterModal";
 import "./globals.css";
 
 const montserrat = Montserrat({
@@ -54,6 +55,7 @@ export default function RootLayout({
     <html lang="en" className="dark">
       <body className={`${montserrat.variable} ${unifrakturCook.variable} font-sans antialiased text-text-primary min-h-screen`}>
         {children}
+        <NewsletterModal />
         <Analytics />
         <SpeedInsights />
       </body>
