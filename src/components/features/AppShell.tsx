@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
+import { NewsletterSignupLink } from './NewsletterSignupLink';
 
 interface NavItem {
   href: string;
@@ -163,7 +164,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           <p className="text-center text-xs text-text-muted">
             Duskwarden Tools is an independent product and is not affiliated with The Arcane Library, LLC.
           </p>
-          <p className="mt-2 text-center text-xs text-text-muted">
+          <p className="mt-2 text-center text-xs text-text-muted flex items-center justify-center gap-3 flex-wrap">
+            <NewsletterSignupLink />
+            <span className="text-border">·</span>
             <a
               href="mailto:duskwardentools@gmail.com?subject=Duskwarden%20Feedback"
               className="text-accent hover:text-accent-hover transition-colors underline underline-offset-2"

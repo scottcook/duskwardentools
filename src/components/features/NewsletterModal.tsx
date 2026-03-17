@@ -21,6 +21,17 @@ export function NewsletterModal() {
     }
   }, []);
 
+  useEffect(() => {
+    const handleShow = () => {
+      setIsOpen(true);
+      setEmail('');
+      setStatus('idle');
+      setErrorMessage('');
+    };
+    window.addEventListener('duskwarden-show-newsletter', handleShow);
+    return () => window.removeEventListener('duskwarden-show-newsletter', handleShow);
+  }, []);
+
   const dismiss = useCallback(() => {
     setIsOpen(false);
     sessionStorage.setItem(SESSION_KEY, 'dismissed');
