@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { FeedbackLink } from '@/components/features/FeedbackLink';
 import { JsonLd } from '@/components/features/JsonLd';
 import { NewsletterSignupLink } from '@/components/features/NewsletterSignupLink';
 import { buildMetadata, siteConfig } from '@/lib/seo';
@@ -320,12 +321,7 @@ export default function LandingPage() {
             <span className="text-border">·</span>
             <NewsletterSignupLink />
             <span className="text-border">·</span>
-            <a
-              href={`mailto:${siteConfig.email}?subject=Duskwarden%20Feedback`}
-              className="text-accent hover:text-accent-hover transition-colors underline underline-offset-2"
-            >
-              Feedback
-            </a>
+            <FeedbackLink />
           </p>
         </div>
       </footer>
