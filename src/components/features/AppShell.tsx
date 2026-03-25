@@ -166,9 +166,9 @@ export function AppShell({ children }: { children: ReactNode }) {
             Duskwarden Tools is an independent product and is not affiliated with The Arcane Library, LLC.
           </p>
           <p className="mt-2 text-center text-xs text-text-muted flex items-center justify-center gap-3 flex-wrap">
-            <NewsletterSignupLink />
+            <NewsletterSignupLink location="app_footer" />
             <span className="text-border">·</span>
-            <FeedbackLink />
+            <FeedbackLink location="app_footer" />
           </p>
         </div>
       </footer>

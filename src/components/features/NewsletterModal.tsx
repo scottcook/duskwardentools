@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Input, Button } from '@/components/ui';
 import { useBodyScrollLock } from '@/components/ui/useBodyScrollLock';
+import { trackEvent } from '@/lib/analytics';
 import { submitContactForm } from './contactForm';
 
 const SESSION_KEY = 'duskwarden-newsletter-seen';
@@ -10,6 +11,7 @@ const AUTO_OPEN_DELAY_MS = 3000;
 
 export function NewsletterModal() {
   const [isOpen, setIsOpen] = useState(false);
+  const [openSource, setOpenSource] = useState('auto');
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
@@ -20,13 +22,18 @@ export function NewsletterModal() {
     if (typeof window === 'undefined') return;
     const seen = sessionStorage.getItem(SESSION_KEY);
     if (!seen) {
-      const timeout = window.setTimeout(() => setIsOpen(true), AUTO_OPEN_DELAY_MS);
+      const timeout = window.setTimeout(() => {
+        setOpenSource('auto');
+        setIsOpen(true);
+      }, AUTO_OPEN_DELAY_MS);
       return () => window.clearTimeout(timeout);
     }
   }, []);
 
   useEffect(() => {
-    const handleShow = () => {
+    const handleShow = (event: Event) => {
+      const source = (event as CustomEvent<{ source?: string }>).detail?.source ?? 'manual';
+      setOpenSource(source);
       setIsOpen(true);
       setEmail('');
       setStatus('idle');
@@ -35,6 +42,11 @@ export function NewsletterModal() {
     window.addEventListener('duskwarden-show-newsletter', handleShow);
     return () => window.removeEventListener('duskwarden-show-newsletter', handleShow);
   }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    trackEvent('newsletter_open', { source: openSource });
+  }, [isOpen, openSource]);
 
   const dismiss = useCallback(() => {
     setIsOpen(false);
@@ -55,6 +67,7 @@ export function NewsletterModal() {
           subject: 'Duskwarden Newsletter Signup',
           kind: 'newsletter',
         });
+        trackEvent('newsletter_submit', { source: openSource });
         setStatus('success');
         sessionStorage.setItem(SESSION_KEY, 'submitted');
       } catch {
@@ -62,7 +75,7 @@ export function NewsletterModal() {
         setErrorMessage('Something went wrong. Please try again.');
       }
     },
-    [email]
+    [email, openSource]
   );
 
   useEffect(() => {

@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { JsonLd } from '@/components/features/JsonLd';
 import { MarketingShell } from '@/components/features/MarketingShell';
+import { TrackedLink } from '@/components/features/TrackedLink';
 import { buildMetadata, siteConfig } from '@/lib/seo';
 
 export const metadata: Metadata = buildMetadata({
@@ -56,12 +57,22 @@ export default function FiveEToOsrPage() {
             Duskwarden helps GMs convert 5e monster stat blocks into streamlined OSR stat cards without rebuilding every creature by hand. Paste a source stat block, generate a compact output card, then tune durability, deadliness, and export format.
           </p>
           <div className="flex flex-wrap gap-3">
-            <Link href="/app/convert" className="px-5 py-3 bg-accent text-bg-base font-semibold rounded-lg hover:bg-accent-hover transition-colors">
+            <TrackedLink
+              href="/app/convert"
+              className="px-5 py-3 bg-accent text-bg-base font-semibold rounded-lg hover:bg-accent-hover transition-colors"
+              eventName="marketing_cta_click"
+              eventProperties={{ location: '5e_lander_hero', destination: 'convert', style: 'primary' }}
+            >
               Convert a 5e monster
-            </Link>
-            <Link href="/faq" className="px-5 py-3 border border-border text-text-primary rounded-lg hover:bg-bg-surface transition-colors">
+            </TrackedLink>
+            <TrackedLink
+              href="/faq"
+              className="px-5 py-3 border border-border text-text-primary rounded-lg hover:bg-bg-surface transition-colors"
+              eventName="marketing_cta_click"
+              eventProperties={{ location: '5e_lander_hero', destination: 'faq', style: 'secondary' }}
+            >
               Read the FAQ
-            </Link>
+            </TrackedLink>
           </div>
         </div>
 

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { JsonLd } from '@/components/features/JsonLd';
 import { MarketingShell } from '@/components/features/MarketingShell';
+import { TrackedLink } from '@/components/features/TrackedLink';
 import { buildMetadata } from '@/lib/seo';
 
 export const metadata: Metadata = buildMetadata({
@@ -56,12 +56,22 @@ export default function ShadowdarkCompatiblePage() {
             Duskwarden helps GMs turn existing monster stat blocks into compatibility-focused stat cards for use with Shadowdark RPG. It is designed for practical prep and table use, not for reproducing official bestiary content.
           </p>
           <div className="flex flex-wrap gap-3">
-            <Link href="/app/convert" className="px-5 py-3 bg-accent text-bg-base font-semibold rounded-lg hover:bg-accent-hover transition-colors">
+            <TrackedLink
+              href="/app/convert"
+              className="px-5 py-3 bg-accent text-bg-base font-semibold rounded-lg hover:bg-accent-hover transition-colors"
+              eventName="marketing_cta_click"
+              eventProperties={{ location: 'shadowdark_lander_hero', destination: 'convert', style: 'primary' }}
+            >
               Build a compatible card
-            </Link>
-            <Link href="/ose-bx-monster-converter" className="px-5 py-3 border border-border text-text-primary rounded-lg hover:bg-bg-surface transition-colors">
+            </TrackedLink>
+            <TrackedLink
+              href="/ose-bx-monster-converter"
+              className="px-5 py-3 border border-border text-text-primary rounded-lg hover:bg-bg-surface transition-colors"
+              eventName="marketing_cta_click"
+              eventProperties={{ location: 'shadowdark_lander_hero', destination: 'ose_bx', style: 'secondary' }}
+            >
               Compare OSE and B/X workflows
-            </Link>
+            </TrackedLink>
           </div>
         </div>
 

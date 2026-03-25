@@ -2,17 +2,21 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { Button, Input, Modal, Textarea } from '@/components/ui';
+import { trackEvent } from '@/lib/analytics';
 import { submitContactForm } from './contactForm';
 
 export function FeedbackModal() {
   const [isOpen, setIsOpen] = useState(false);
+  const [openSource, setOpenSource] = useState('unknown');
   const [message, setMessage] = useState('');
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
-    const handleShow = () => {
+    const handleShow = (event: Event) => {
+      const source = (event as CustomEvent<{ source?: string }>).detail?.source ?? 'unknown';
+      setOpenSource(source);
       setIsOpen(true);
       setMessage('');
       setEmail('');
@@ -23,6 +27,11 @@ export function FeedbackModal() {
     window.addEventListener('duskwarden-show-feedback', handleShow);
     return () => window.removeEventListener('duskwarden-show-feedback', handleShow);
   }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    trackEvent('feedback_open', { source: openSource });
+  }, [isOpen, openSource]);
 
   const dismiss = useCallback(() => {
     setIsOpen(false);
@@ -46,13 +55,14 @@ export function FeedbackModal() {
           subject: 'Duskwarden Feedback',
           kind: 'feedback',
         });
+        trackEvent('feedback_submit', { source: openSource });
         setStatus('success');
       } catch {
         setStatus('error');
         setErrorMessage('Something went wrong. Please try again.');
       }
     },
-    [email, message]
+    [email, message, openSource]
   );
 
   return (

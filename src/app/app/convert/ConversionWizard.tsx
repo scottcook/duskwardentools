@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Stepper, Card } from '@/components/ui';
+import { trackEvent } from '@/lib/analytics';
 import { getDefaultSettings } from '@/lib/conversion/engine';
 import { detectSourceSystem } from '@/lib/parser/detectSourceSystem';
 import { parseStatBlock } from '@/lib/parser';
@@ -198,6 +199,13 @@ export function ConversionWizard({
   const [title, setTitle] = useState(existingEntry?.title ?? '');
   const [tags, setTags] = useState<string[]>(existingEntry?.tags ?? []);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    trackEvent('convert_wizard_view', {
+      source: existingEntry ? 'edit_entry' : 'new_entry',
+      hasDefaultProject: Boolean(defaultProjectId),
+    });
+  }, [defaultProjectId, existingEntry]);
 
   useEffect(() => {
     getLocalProjects().then(lp => {
@@ -426,6 +434,12 @@ export function ConversionWizard({
       validationReport,
       step: 2,
     }));
+    trackEvent('convert_step_complete', {
+      step: 'source',
+      sourceSystem: state.sourceSystem,
+      profileId: state.settings.conversionProfileId,
+      outputPackId: outputData.outputPackId,
+    });
     const effectiveName = state.creatureName || outputData.name || parsed.name || '';
     if (!title) setTitle(effectiveName);
   }, [state.sourceText, state.sourceSystem, state.settings, state.metadata, state.creatureName, state.referenceStatblock, title]);
@@ -475,12 +489,18 @@ export function ConversionWizard({
       } else {
         await saveEntry(entryData);
       }
+      trackEvent('convert_step_complete', {
+        step: 'convert',
+        action: existingEntry ? 'update' : 'save',
+        outputPackId: state.outputData.outputPackId,
+        profileId: state.settings.conversionProfileId,
+      });
       setState(prev => ({ ...prev, step: 3 }));
     } catch (err) {
       console.error('Failed to save entry:', err);
     }
     setSaving(false);
-  }, [state.outputData, state.sourceText, state.parsedData, projectId, title, tags, existingEntry]);
+  }, [state.outputData, state.sourceText, state.parsedData, state.settings.conversionProfileId, projectId, title, tags, existingEntry]);
 
 
   const resetWizard = useCallback(() => {
@@ -570,8 +590,14 @@ export function ConversionWizard({
           <Step4Export
             outputData={state.outputData}
             title={title}
-            onStartNew={resetWizard}
-            onGoToLibrary={() => router.push('/app/library')}
+            onStartNew={() => {
+              trackEvent('convert_export_action', { action: 'start_new' });
+              resetWizard();
+            }}
+            onGoToLibrary={() => {
+              trackEvent('convert_export_action', { action: 'go_to_library' });
+              router.push('/app/library');
+            }}
           />
         )}
       </Card>

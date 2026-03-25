@@ -1,8 +1,7 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
-import { FeedbackLink } from '@/components/features/FeedbackLink';
 import { JsonLd } from '@/components/features/JsonLd';
-import { NewsletterSignupLink } from '@/components/features/NewsletterSignupLink';
+import { MarketingShell } from '@/components/features/MarketingShell';
+import { TrackedLink } from '@/components/features/TrackedLink';
 import { buildMetadata, siteConfig } from '@/lib/seo';
 
 export const metadata: Metadata = buildMetadata({
@@ -20,29 +19,6 @@ export const metadata: Metadata = buildMetadata({
     'monster stat card generator',
   ],
 });
-
-const faqItems = [
-  {
-    question: 'Can Duskwarden convert 5e monsters to OSR stat cards?',
-    answer:
-      'Yes. Duskwarden converts 5e, OSE, B/X, and generic monster stat blocks into streamlined OSR-style stat cards that are easier to run at the table.',
-  },
-  {
-    question: 'Does Duskwarden support OSE and B/X monster stat blocks?',
-    answer:
-      'Yes. Duskwarden supports OSE and B/X style inputs and can turn them into compact stat cards with printable and JSON export options.',
-  },
-  {
-    question: 'Can I use Duskwarden for Shadowdark RPG?',
-    answer:
-      'Duskwarden offers Shadowdark-compatible output designed for use with Shadowdark RPG. It is a compatibility tool and does not reproduce official bestiary entries.',
-  },
-  {
-    question: 'Can I print or export converted monsters?',
-    answer:
-      'Yes. You can copy converted creatures as text, download JSON, print cards, and save them in the library for later editing or organization.',
-  },
-];
 
 const softwareSchema = {
   '@context': 'https://schema.org',
@@ -82,249 +58,219 @@ const organizationSchema = {
   email: siteConfig.email,
 };
 
-const faqSchema = {
-  '@context': 'https://schema.org',
-  '@type': 'FAQPage',
-  mainEntity: faqItems.map((item) => ({
-    '@type': 'Question',
-    name: item.question,
-    acceptedAnswer: {
-      '@type': 'Answer',
-      text: item.answer,
-    },
-  })),
-};
+const workflowCards = [
+  {
+    title: '5e to OSR',
+    description: 'Turn fuller 5e monster blocks into faster, lighter cards built for old-school pacing.',
+    href: '/5e-to-osr-monster-converter',
+    eventDestination: '5e_to_osr',
+  },
+  {
+    title: 'Shadowdark-compatible',
+    description: 'Generate compatibility-focused cards for Shadowdark-ready prep without rebuilding everything by hand.',
+    href: '/shadowdark-compatible-monster-stat-cards',
+    eventDestination: 'shadowdark',
+  },
+  {
+    title: 'OSE and B/X',
+    description: 'Standardize old-school monsters into compact printable cards and exportable JSON.',
+    href: '/ose-bx-monster-converter',
+    eventDestination: 'ose_bx',
+  },
+];
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen flex flex-col bg-bg-base">
+    <MarketingShell>
       <JsonLd data={softwareSchema} />
       <JsonLd data={websiteSchema} />
       <JsonLd data={organizationSchema} />
-      <JsonLd data={faqSchema} />
-
-      <header className="border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-          <Link
-            href="/"
-            className="text-4xl text-text-primary hover:text-accent transition-colors"
-            style={{ fontFamily: 'var(--font-unifraktur)' }}
-          >
-            Duskwarden
-          </Link>
-          <div className="flex items-center gap-3">
-            <Link
-              href="/faq"
-              className="text-sm text-text-muted hover:text-text-primary transition-colors"
-            >
-              FAQ
-            </Link>
-            <Link
-              href="/app"
-              className="px-4 py-2 bg-accent text-bg-base font-medium rounded-lg hover:bg-accent-hover transition-colors focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-bg-base"
-            >
-              Open App
-            </Link>
-          </div>
-        </div>
-      </header>
-
-      <main className="flex-1">
-        <section className="px-4 pt-16 pb-10">
-          <div className="max-w-5xl mx-auto text-center">
-            <p className="text-sm uppercase tracking-[0.2em] text-accent/80 mb-4">
-              Monster stat block converter for tabletop RPG GMs
-            </p>
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-text-primary max-w-5xl mx-auto text-balance leading-tight">
-              Convert 5e, OSE, and B/X monster stat blocks into OSR and Shadowdark-compatible stat cards
-            </h1>
-            <p className="mt-6 text-lg text-text-muted max-w-3xl mx-auto text-balance">
-              Duskwarden helps you paste existing monster stat blocks, generate streamlined stat cards, tune difficulty for your table, and export printable or JSON-ready results.
-            </p>
-            <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link
-                href="/app/convert"
-                className="px-6 py-3 bg-accent text-bg-base font-semibold rounded-lg hover:bg-accent-hover transition-colors focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-bg-base"
-              >
-                Start Converting
-              </Link>
-              <Link
-                href="/5e-to-osr-monster-converter"
-                className="px-6 py-3 border border-border text-text-primary font-semibold rounded-lg hover:bg-bg-surface transition-colors focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-bg-base"
-              >
-                See 5e to OSR workflow
-              </Link>
-            </div>
-            <div className="mt-6 flex items-center justify-center gap-3 flex-wrap text-sm text-text-muted">
-              <span>Supports 5e</span>
-              <span className="text-border">•</span>
-              <span>Supports OSE</span>
-              <span className="text-border">•</span>
-              <span>Supports B/X</span>
-              <span className="text-border">•</span>
-              <span>Exports print and JSON</span>
-            </div>
-          </div>
-        </section>
-
-        <section className="px-4 py-10">
-          <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="p-6 bg-bg-surface border border-border rounded-lg">
-              <div className="w-12 h-12 mb-4 bg-accent/10 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-              </div>
-              <h2 className="text-lg font-semibold text-text-primary mb-2">Paste and convert supported stat blocks</h2>
-              <p className="text-sm text-text-muted">
-                Use the conversion wizard to turn 5e, OSE, B/X, and generic monster blocks into compact stat cards in seconds.
-              </p>
-            </div>
-
-            <div className="p-6 bg-bg-surface border border-border rounded-lg">
-              <div className="w-12 h-12 mb-4 bg-accent/10 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v12m6-6H6" />
-                </svg>
-              </div>
-              <h2 className="text-lg font-semibold text-text-primary mb-2">Tune deadliness, durability, and output style</h2>
-              <p className="text-sm text-text-muted">
-                Adjust conversion settings to fit your campaign, from general OSR play to Shadowdark-compatible formatting and difficulty targets.
-              </p>
-            </div>
-
-            <div className="p-6 bg-bg-surface border border-border rounded-lg">
-              <div className="w-12 h-12 mb-4 bg-accent/10 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
-              </div>
-              <h2 className="text-lg font-semibold text-text-primary mb-2">Export printable monster stat cards</h2>
-              <p className="text-sm text-text-muted">
-                Save to the library, print cards for the table, or export JSON and text for your own GM workflow and prep tools.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        <section className="px-4 py-10">
-          <div className="max-w-6xl mx-auto">
+      <main className="px-4 py-12 sm:py-16">
+        <div className="max-w-7xl mx-auto space-y-12 sm:space-y-16">
+          <section className="grid gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)] lg:items-center">
             <div className="max-w-3xl">
-              <h2 className="text-3xl font-bold text-text-primary">Popular use cases</h2>
-              <p className="mt-3 text-text-muted">
-                These pages answer the most common questions about converting monsters for old-school play and Shadowdark-compatible tables.
+              <p className="text-sm uppercase tracking-[0.24em] text-accent/80">
+                Monster stat block converter for tabletop RPG GMs
+              </p>
+              <h1 className="mt-5 text-4xl sm:text-5xl lg:text-6xl font-bold text-text-primary text-balance leading-tight">
+                Convert source stat blocks into table-ready OSR and Shadowdark-compatible cards
+              </h1>
+              <p className="mt-6 text-lg text-text-muted max-w-2xl text-balance">
+                Paste a 5e, OSE, or B/X monster, tune the result for your table, and export a cleaner stat card without rebuilding the creature from scratch.
+              </p>
+              <div className="mt-8 flex flex-col sm:flex-row items-start gap-4">
+                <TrackedLink
+                  href="/app/convert"
+                  className="inline-flex items-center justify-center px-6 py-3 bg-accent text-bg-base font-semibold rounded-xl hover:bg-accent-hover transition-colors focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-bg-base"
+                  eventName="marketing_cta_click"
+                  eventProperties={{ location: 'home_hero', destination: 'convert', style: 'primary' }}
+                >
+                  Start Converting
+                </TrackedLink>
+                <TrackedLink
+                  href="/faq"
+                  className="inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-text-muted hover:text-text-primary transition-colors"
+                  eventName="marketing_cta_click"
+                  eventProperties={{ location: 'home_hero', destination: 'faq', style: 'text' }}
+                >
+                  Read the FAQ
+                </TrackedLink>
+              </div>
+              <div className="mt-8 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-text-muted">
+                <span>Supports 5e, OSE, and B/X</span>
+                <span className="text-border">•</span>
+                <span>OSR and Shadowdark-compatible outputs</span>
+                <span className="text-border">•</span>
+                <span>Print, text, and JSON export</span>
+              </div>
+            </div>
+
+            <div className="relative">
+              <div className="absolute -inset-3 rounded-4xl bg-accent/8 blur-2xl" aria-hidden="true" />
+              <div className="relative overflow-hidden rounded-[1.75rem] border border-border bg-bg-surface/95 shadow-2xl shadow-black/30">
+                <div className="border-b border-border px-5 py-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.22em] text-accent/70">Product Preview</p>
+                      <p className="mt-1 text-sm font-medium text-text-primary">A calmer way to prep monster cards</p>
+                    </div>
+                    <span className="rounded-full border border-border bg-bg-base px-3 py-1 text-xs text-text-muted">
+                      Converter flow
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 p-5">
+                  <div className="rounded-2xl border border-border bg-bg-base/80 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-text-primary">Step 1</p>
+                        <p className="mt-1 text-sm text-text-muted">Paste a source stat block and choose the output profile.</p>
+                      </div>
+                      <span className="rounded-full bg-accent/10 px-3 py-1 text-xs font-medium text-accent">
+                        Parse
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-border bg-bg-base/80 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-text-primary">Step 2</p>
+                        <p className="mt-1 text-sm text-text-muted">Tune threat, durability, and compatibility output for your table.</p>
+                      </div>
+                      <span className="rounded-full bg-accent/10 px-3 py-1 text-xs font-medium text-accent">
+                        Adjust
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-accent/20 bg-accent/5 p-5">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="text-lg font-semibold text-text-primary">Goblin Cutpurse</p>
+                        <p className="mt-1 text-sm text-text-muted">Compact card preview</p>
+                      </div>
+                      <span className="rounded-full border border-accent/20 bg-bg-base px-3 py-1 text-xs text-accent">
+                        Tier 1
+                      </span>
+                    </div>
+                    <div className="mt-4 grid grid-cols-3 gap-3 text-sm">
+                      <div className="rounded-xl border border-border bg-bg-base px-3 py-2">
+                        <p className="text-xs uppercase tracking-[0.18em] text-text-muted">AC</p>
+                        <p className="mt-1 font-semibold text-text-primary">13</p>
+                      </div>
+                      <div className="rounded-xl border border-border bg-bg-base px-3 py-2">
+                        <p className="text-xs uppercase tracking-[0.18em] text-text-muted">HP</p>
+                        <p className="mt-1 font-semibold text-text-primary">7</p>
+                      </div>
+                      <div className="rounded-xl border border-border bg-bg-base px-3 py-2">
+                        <p className="text-xs uppercase tracking-[0.18em] text-text-muted">Move</p>
+                        <p className="mt-1 font-semibold text-text-primary">30&apos;</p>
+                      </div>
+                    </div>
+                    <div className="mt-4 space-y-2 text-sm text-text-muted">
+                      <p><span className="font-medium text-text-primary">Attack:</span> Scimitar +3 (1d6)</p>
+                      <p><span className="font-medium text-text-primary">Trait:</span> Gains advantage when striking from surprise.</p>
+                      <p><span className="font-medium text-text-primary">Export:</span> Save to library, print card, or download JSON.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="grid gap-4 md:grid-cols-3">
+            <div className="rounded-2xl border border-border bg-bg-surface p-6">
+              <p className="text-sm font-semibold text-text-primary">Fewer steps</p>
+              <p className="mt-2 text-sm text-text-muted">
+                Paste, convert, and export in one flow without stitching together multiple prep tools.
               </p>
             </div>
-            <div className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <Link href="/5e-to-osr-monster-converter" className="block p-6 bg-bg-surface border border-border rounded-lg hover:border-accent/50 transition-colors">
-                <h3 className="text-lg font-semibold text-text-primary">5e to OSR monster converter</h3>
-                <p className="mt-2 text-sm text-text-muted">
-                  Learn how to turn 5e monsters into faster, lighter OSR stat cards without rebuilding them from scratch.
-                </p>
-              </Link>
-              <Link href="/shadowdark-compatible-monster-stat-cards" className="block p-6 bg-bg-surface border border-border rounded-lg hover:border-accent/50 transition-colors">
-                <h3 className="text-lg font-semibold text-text-primary">Shadowdark-compatible stat cards</h3>
-                <p className="mt-2 text-sm text-text-muted">
-                  See how Duskwarden creates compatibility-focused output for use with Shadowdark RPG while staying independent.
-                </p>
-              </Link>
-              <Link href="/ose-bx-monster-converter" className="block p-6 bg-bg-surface border border-border rounded-lg hover:border-accent/50 transition-colors">
-                <h3 className="text-lg font-semibold text-text-primary">OSE and B/X monster conversion</h3>
-                <p className="mt-2 text-sm text-text-muted">
-                  Explore a workflow for converting Old-School Essentials and B/X creatures into printable stat cards and exports.
-                </p>
-              </Link>
+            <div className="rounded-2xl border border-border bg-bg-surface p-6">
+              <p className="text-sm font-semibold text-text-primary">Sharper table output</p>
+              <p className="mt-2 text-sm text-text-muted">
+                Generate leaner cards built for reading quickly at the table instead of scanning dense source text.
+              </p>
             </div>
-          </div>
-        </section>
+            <div className="rounded-2xl border border-border bg-bg-surface p-6">
+              <p className="text-sm font-semibold text-text-primary">Export-ready</p>
+              <p className="mt-2 text-sm text-text-muted">
+                Save creatures, print cards, or move the results into your own workflow as structured JSON.
+              </p>
+            </div>
+          </section>
 
-        <section className="px-4 py-10">
-          <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr] gap-8">
-            <div className="bg-bg-surface border border-border rounded-lg p-6">
-              <h2 className="text-3xl font-bold text-text-primary">How Duskwarden works</h2>
-              <ol className="mt-6 space-y-4 text-text-muted">
-                <li>
-                  <span className="font-semibold text-text-primary">1. Paste a source stat block.</span> Start with a 5e, OSE, B/X, or generic monster block.
-                </li>
-                <li>
-                  <span className="font-semibold text-text-primary">2. Choose your output target.</span> Convert into OSR-style or Shadowdark-compatible stat cards.
-                </li>
-                <li>
-                  <span className="font-semibold text-text-primary">3. Tune and verify.</span> Adjust difficulty, durability, and deadliness to match your table.
-                </li>
-                <li>
-                  <span className="font-semibold text-text-primary">4. Save, print, or export.</span> Organize creatures in the library, then print cards or export JSON.
-                </li>
-              </ol>
+          <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+            <div>
+              <p className="text-sm uppercase tracking-[0.22em] text-accent/80">Choose your workflow</p>
+              <h2 className="mt-3 text-3xl font-bold text-text-primary">Use the page that matches what you are trying to do</h2>
+              <p className="mt-3 max-w-2xl text-text-muted">
+                The homepage is here to get you into the tool quickly. The dedicated workflow pages go deeper on use cases, compatibility language, and search-oriented explanations.
+              </p>
+              <div className="mt-8 grid gap-4 lg:grid-cols-3">
+                {workflowCards.map((card) => (
+                  <TrackedLink
+                    key={card.href}
+                    href={card.href}
+                    className="group rounded-2xl border border-border bg-bg-surface p-6 transition-colors hover:border-accent/40"
+                    eventName="marketing_cta_click"
+                    eventProperties={{ location: 'home_workflows', destination: card.eventDestination, style: 'card' }}
+                  >
+                    <p className="text-lg font-semibold text-text-primary">{card.title}</p>
+                    <p className="mt-3 text-sm text-text-muted">{card.description}</p>
+                    <p className="mt-5 text-sm font-medium text-accent">Explore this workflow</p>
+                  </TrackedLink>
+                ))}
+              </div>
             </div>
-            <div className="bg-bg-surface border border-border rounded-lg p-6">
-              <h2 className="text-2xl font-bold text-text-primary">Direct answers</h2>
-              <dl className="mt-6 space-y-4">
-                <div>
-                  <dt className="font-semibold text-text-primary">Supports</dt>
-                  <dd className="mt-1 text-sm text-text-muted">5e, OSE, B/X, and generic stat blocks</dd>
-                </div>
-                <div>
-                  <dt className="font-semibold text-text-primary">Output styles</dt>
-                  <dd className="mt-1 text-sm text-text-muted">OSR-style cards and Shadowdark-compatible cards</dd>
-                </div>
-                <div>
-                  <dt className="font-semibold text-text-primary">Exports</dt>
-                  <dd className="mt-1 text-sm text-text-muted">Printable cards, text copy, and JSON download</dd>
-                </div>
-                <div>
-                  <dt className="font-semibold text-text-primary">Important note</dt>
-                  <dd className="mt-1 text-sm text-text-muted">Duskwarden is an independent compatibility tool and is not affiliated with The Arcane Library, LLC.</dd>
-                </div>
-              </dl>
-            </div>
-          </div>
-        </section>
 
-        <section className="px-4 py-10">
-          <div className="max-w-4xl mx-auto">
-            <h2 className="text-3xl font-bold text-text-primary">Frequently asked questions</h2>
-            <div className="mt-8 space-y-4">
-              {faqItems.map((item) => (
-                <details key={item.question} className="group border border-border rounded-lg bg-bg-surface overflow-hidden">
-                  <summary className="list-none cursor-pointer px-5 py-4 flex items-center justify-between gap-4">
-                    <span className="font-semibold text-text-primary">{item.question}</span>
-                    <svg className="w-4 h-4 text-text-muted transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </summary>
-                  <div className="px-5 pb-5 text-sm text-text-muted">
-                    {item.answer}
-                  </div>
-                </details>
-              ))}
+            <div className="rounded-[1.75rem] border border-border bg-bg-surface p-6">
+              <p className="text-sm uppercase tracking-[0.22em] text-accent/80">Start Here</p>
+              <h2 className="mt-3 text-2xl font-bold text-text-primary">Open the converter when you already know the job to be done</h2>
+              <p className="mt-3 text-sm text-text-muted">
+                Best for returning users, quick prep sessions, or anyone arriving with a stat block already in hand.
+              </p>
+              <TrackedLink
+                href="/app/convert"
+                className="mt-6 inline-flex items-center justify-center w-full px-5 py-3 bg-accent text-bg-base font-semibold rounded-xl hover:bg-accent-hover transition-colors focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-bg-surface"
+                eventName="marketing_cta_click"
+                eventProperties={{ location: 'home_sidebar', destination: 'convert', style: 'primary' }}
+              >
+                Go straight to Convert
+              </TrackedLink>
+              <TrackedLink
+                href="/faq"
+                className="mt-3 inline-flex items-center justify-center w-full px-5 py-3 border border-border text-text-primary font-medium rounded-xl hover:bg-bg-base transition-colors focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-bg-surface"
+                eventName="marketing_cta_click"
+                eventProperties={{ location: 'home_sidebar', destination: 'faq', style: 'secondary' }}
+              >
+                Read common questions first
+              </TrackedLink>
             </div>
-            <p className="mt-6 text-sm text-text-muted">
-              Looking for more direct answers? Visit the <Link href="/faq" className="text-accent hover:text-accent-hover underline underline-offset-2">full Duskwarden FAQ</Link>.
-            </p>
-          </div>
-        </section>
-      </main>
-
-      <footer className="border-t border-border">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <p className="text-center text-xs text-text-muted">
-            Duskwarden Tools is an independent product and is not affiliated with The Arcane Library, LLC.
-          </p>
-          <p className="mt-1 text-center text-xs text-text-muted">
-            Conversion output uses compatibility heuristics and should be reviewed before publication or play.
-          </p>
-          <p className="mt-2 text-center text-xs text-text-muted flex items-center justify-center gap-3 flex-wrap">
-            <Link href="/faq" className="text-accent hover:text-accent-hover transition-colors underline underline-offset-2">
-              FAQ
-            </Link>
-            <span className="text-border">·</span>
-            <NewsletterSignupLink />
-            <span className="text-border">·</span>
-            <FeedbackLink />
-          </p>
+          </section>
         </div>
-      </footer>
-    </div>
+      </main>
+    </MarketingShell>
   );
 }

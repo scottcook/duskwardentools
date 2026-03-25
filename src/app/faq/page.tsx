@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { JsonLd } from '@/components/features/JsonLd';
 import { MarketingShell } from '@/components/features/MarketingShell';
+import { TrackedLink } from '@/components/features/TrackedLink';
 import { buildMetadata, siteConfig } from '@/lib/seo';
 
 export const metadata: Metadata = buildMetadata({
@@ -91,18 +91,45 @@ export default function FaqPage() {
           ))}
         </section>
 
-        <section className="bg-bg-surface border border-border rounded-lg p-6">
-          <h2 className="text-2xl font-bold text-text-primary">Need a specific workflow?</h2>
-          <div className="mt-4 flex flex-wrap gap-3">
-            <Link href="/5e-to-osr-monster-converter" className="px-4 py-2 border border-border text-text-primary rounded-lg hover:bg-bg-base transition-colors">
+        <section className="rounded-[1.75rem] border border-border bg-bg-surface p-6 sm:p-8">
+          <p className="text-sm uppercase tracking-[0.22em] text-accent/80">Fastest path</p>
+          <h2 className="mt-3 text-2xl font-bold text-text-primary">Ready to convert a stat block?</h2>
+          <p className="mt-3 max-w-2xl text-sm text-text-muted">
+            If you already know what you want to convert, go straight into the converter. If you want a more specific explanation first, use one of the workflow pages below.
+          </p>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <TrackedLink
+              href="/app/convert"
+              className="px-5 py-3 bg-accent text-bg-base font-semibold rounded-xl hover:bg-accent-hover transition-colors"
+              eventName="faq_cta_click"
+              eventProperties={{ location: 'faq_primary', destination: 'convert' }}
+            >
+              Start converting
+            </TrackedLink>
+            <TrackedLink
+              href="/5e-to-osr-monster-converter"
+              className="px-4 py-2 border border-border text-text-primary rounded-lg hover:bg-bg-base transition-colors"
+              eventName="faq_cta_click"
+              eventProperties={{ location: 'faq_workflows', destination: '5e_to_osr' }}
+            >
               5e to OSR
-            </Link>
-            <Link href="/ose-bx-monster-converter" className="px-4 py-2 border border-border text-text-primary rounded-lg hover:bg-bg-base transition-colors">
+            </TrackedLink>
+            <TrackedLink
+              href="/ose-bx-monster-converter"
+              className="px-4 py-2 border border-border text-text-primary rounded-lg hover:bg-bg-base transition-colors"
+              eventName="faq_cta_click"
+              eventProperties={{ location: 'faq_workflows', destination: 'ose_bx' }}
+            >
               OSE and B/X
-            </Link>
-            <Link href="/shadowdark-compatible-monster-stat-cards" className="px-4 py-2 border border-border text-text-primary rounded-lg hover:bg-bg-base transition-colors">
+            </TrackedLink>
+            <TrackedLink
+              href="/shadowdark-compatible-monster-stat-cards"
+              className="px-4 py-2 border border-border text-text-primary rounded-lg hover:bg-bg-base transition-colors"
+              eventName="faq_cta_click"
+              eventProperties={{ location: 'faq_workflows', destination: 'shadowdark' }}
+            >
               Shadowdark-compatible
-            </Link>
+            </TrackedLink>
           </div>
           <p className="mt-4 text-sm text-text-muted">
             For other questions, email{' '}

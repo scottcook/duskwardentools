@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { JsonLd } from '@/components/features/JsonLd';
 import { MarketingShell } from '@/components/features/MarketingShell';
+import { TrackedLink } from '@/components/features/TrackedLink';
 import { buildMetadata } from '@/lib/seo';
 
 export const metadata: Metadata = buildMetadata({
@@ -17,10 +19,34 @@ export const metadata: Metadata = buildMetadata({
   ],
 });
 
+const faqSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: [
+    {
+      '@type': 'Question',
+      name: 'Can Duskwarden convert OSE and B/X monster stat blocks?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Yes. Duskwarden supports OSE and B/X style monster stat blocks and converts them into compact old-school monster cards with export options.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'What can I do with an OSE or B/X monster after conversion?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'After conversion, you can review the card, save it to the library, print it, or download JSON for your own prep workflow.',
+      },
+    },
+  ],
+};
+
 export default function OseBxMonsterConverterPage() {
   return (
     <MarketingShell>
       <main className="px-4 py-12">
+        <JsonLd data={faqSchema} />
         <div className="max-w-4xl mx-auto space-y-10">
         <div className="space-y-4">
           <p className="text-sm uppercase tracking-[0.2em] text-accent/80">OSE and B/X conversion</p>
@@ -31,12 +57,22 @@ export default function OseBxMonsterConverterPage() {
             Duskwarden supports OSE and B/X style monster stat blocks and helps you turn them into compact, exportable monster cards for faster prep and table use.
           </p>
           <div className="flex flex-wrap gap-3">
-            <Link href="/app/convert" className="px-5 py-3 bg-accent text-bg-base font-semibold rounded-lg hover:bg-accent-hover transition-colors">
+            <TrackedLink
+              href="/app/convert"
+              className="px-5 py-3 bg-accent text-bg-base font-semibold rounded-lg hover:bg-accent-hover transition-colors"
+              eventName="marketing_cta_click"
+              eventProperties={{ location: 'ose_bx_lander_hero', destination: 'convert', style: 'primary' }}
+            >
               Convert an OSE or B/X monster
-            </Link>
-            <Link href="/5e-to-osr-monster-converter" className="px-5 py-3 border border-border text-text-primary rounded-lg hover:bg-bg-surface transition-colors">
+            </TrackedLink>
+            <TrackedLink
+              href="/5e-to-osr-monster-converter"
+              className="px-5 py-3 border border-border text-text-primary rounded-lg hover:bg-bg-surface transition-colors"
+              eventName="marketing_cta_click"
+              eventProperties={{ location: 'ose_bx_lander_hero', destination: '5e_to_osr', style: 'secondary' }}
+            >
               Compare with 5e conversion
-            </Link>
+            </TrackedLink>
           </div>
         </div>
 

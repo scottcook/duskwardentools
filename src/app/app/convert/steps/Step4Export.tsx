@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui';
 import { CreatureCard } from '@/components/features/CreatureCard';
+import { trackEvent } from '@/lib/analytics';
 import { SYSTEM_PACKS } from '@/lib/systemPacks';
 import type { OutputCreatureData } from '@/types';
 
@@ -65,6 +66,7 @@ export function Step4Export({
 
   const copyToClipboard = async (text: string, type: string) => {
     await navigator.clipboard.writeText(text);
+    trackEvent('convert_export_action', { action: `copy_${type}` });
     setCopied(type);
     setTimeout(() => setCopied(null), 2000);
   };
@@ -94,9 +96,11 @@ export function Step4Export({
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    trackEvent('convert_export_action', { action: 'download_json' });
   };
 
   const handlePrint = () => {
+    trackEvent('convert_export_action', { action: 'print_card' });
     window.print();
   };
 
