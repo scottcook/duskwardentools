@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, type ReactNode } from 'react';
+import { useBodyScrollLock } from './useBodyScrollLock';
 
 interface ModalProps {
   isOpen: boolean;
@@ -21,6 +22,8 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
   const overlayRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 
+  useBodyScrollLock(isOpen);
+
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -30,12 +33,10 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
 
     if (isOpen) {
       document.addEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'hidden';
     }
 
     return () => {
       document.removeEventListener('keydown', handleEscape);
-      document.body.style.overflow = '';
     };
   }, [isOpen, onClose]);
 

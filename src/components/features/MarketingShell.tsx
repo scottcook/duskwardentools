@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+import { FeedbackLink } from './FeedbackLink';
 import { NewsletterSignupLink } from './NewsletterSignupLink';
 
 export function MarketingShell({ children }: { children: ReactNode }) {
@@ -47,12 +48,7 @@ export function MarketingShell({ children }: { children: ReactNode }) {
           <p className="mt-2 text-center text-xs text-text-muted flex items-center justify-center gap-3 flex-wrap">
             <NewsletterSignupLink />
             <span className="text-border">·</span>
-            <a
-              href="mailto:duskwardentools@gmail.com?subject=Duskwarden%20Feedback"
-              className="text-accent hover:text-accent-hover transition-colors underline underline-offset-2"
-            >
-              Feedback
-            </a>
+            <FeedbackLink />
           </p>
         </div>
       </footer>

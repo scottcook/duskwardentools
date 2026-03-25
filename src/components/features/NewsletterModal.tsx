@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Input, Button } from '@/components/ui';
+import { useBodyScrollLock } from '@/components/ui/useBodyScrollLock';
+import { submitContactForm } from './contactForm';
 
 const SESSION_KEY = 'duskwarden-newsletter-seen';
-const FORMSPREE_ID = process.env.NEXT_PUBLIC_FORMSPREE_NEWSLETTER_ID;
-const CONTACT_EMAIL = 'duskwardentools@gmail.com';
+const AUTO_OPEN_DELAY_MS = 3000;
 
 export function NewsletterModal() {
   const [isOpen, setIsOpen] = useState(false);
@@ -13,11 +14,14 @@ export function NewsletterModal() {
   const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
 
+  useBodyScrollLock(isOpen);
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const seen = sessionStorage.getItem(SESSION_KEY);
     if (!seen) {
-      setIsOpen(true);
+      const timeout = window.setTimeout(() => setIsOpen(true), AUTO_OPEN_DELAY_MS);
+      return () => window.clearTimeout(timeout);
     }
   }, []);
 
@@ -46,23 +50,13 @@ export function NewsletterModal() {
       setErrorMessage('');
 
       try {
-        if (FORMSPREE_ID) {
-          const res = await fetch(`https://formspree.io/f/${FORMSPREE_ID}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              email: email.trim(),
-              _subject: 'Duskwarden Newsletter Signup',
-            }),
-          });
-          if (!res.ok) throw new Error('Submission failed');
-          setStatus('success');
-          sessionStorage.setItem(SESSION_KEY, 'submitted');
-        } else {
-          window.location.href = `mailto:${CONTACT_EMAIL}?subject=Duskwarden%20Newsletter%20Sign-up&body=Please%20add%20me%20to%20the%20newsletter%3A%20${encodeURIComponent(email.trim())}`;
-          setStatus('success');
-          sessionStorage.setItem(SESSION_KEY, 'submitted');
-        }
+        await submitContactForm({
+          email,
+          subject: 'Duskwarden Newsletter Signup',
+          kind: 'newsletter',
+        });
+        setStatus('success');
+        sessionStorage.setItem(SESSION_KEY, 'submitted');
       } catch {
         setStatus('error');
         setErrorMessage('Something went wrong. Please try again.');
@@ -77,11 +71,9 @@ export function NewsletterModal() {
     };
     if (isOpen) {
       document.addEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'hidden';
     }
     return () => {
       document.removeEventListener('keydown', handleEscape);
-      document.body.style.overflow = '';
     };
   }, [isOpen, dismiss]);
 
@@ -89,7 +81,7 @@ export function NewsletterModal() {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 animate-in fade-in duration-200"
       role="dialog"
       aria-modal="true"
       aria-labelledby="newsletter-modal-title"

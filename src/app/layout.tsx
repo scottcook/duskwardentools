@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Montserrat, UnifrakturCook } from 'next/font/google';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/next';
+import { FeedbackModal } from '@/components/features/FeedbackModal';
 import { NewsletterModal } from '@/components/features/NewsletterModal';
 import { siteConfig } from '@/lib/seo';
 import './globals.css';
@@ -63,6 +64,7 @@ export default function RootLayout({
       <body className={`${montserrat.variable} ${unifrakturCook.variable} font-sans antialiased text-text-primary min-h-screen`}>
         {children}
         <NewsletterModal />
+        <FeedbackModal />
         <Analytics />
         <SpeedInsights />
       </body>
