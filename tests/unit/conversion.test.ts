@@ -165,6 +165,185 @@ describe('convertCreature', () => {
   });
 });
 
+describe('Shadowdark multiattack collapse', () => {
+  const knightParsed: ParsedCreatureData = {
+    name: 'Knight',
+    ac: 18,
+    hp: 52,
+    movement: '30 ft',
+    attacks: [
+      { name: 'Greatsword', bonus: 5, damage: '2d6+3' },
+      { name: 'Heavy Crossbow', bonus: 2, damage: '1d10' },
+    ],
+    specialActions: [
+      { name: 'Multiattack', description: 'The knight makes two melee attacks.' },
+      { name: 'Leadership', description: 'For 1 minute the knight can utter a command.' },
+    ],
+    multiattackCount: 2,
+    level: 3,
+  };
+
+  it('should collapse multiattack into a count on the primary attack for SD profile', () => {
+    const settings: ConversionSettings = {
+      ...getDefaultSettings(),
+      conversionProfileId: 'shadowdark_compatible_v1',
+      outputProfile: 'shadowdark_compatible',
+      outputPackId: 'shadowdark_private_verify',
+    };
+
+    const result = convertCreature(knightParsed, settings);
+
+    expect(result.attacks[0].count).toBe(2);
+    expect(result.attacks[0].name).toBe('Greatsword');
+    expect(result.attacks[0].bonus).toBeDefined();
+    expect(result.attacks[0].damage).toBeDefined();
+  });
+
+  it('should remove Multiattack from specialActions when collapsing', () => {
+    const settings: ConversionSettings = {
+      ...getDefaultSettings(),
+      conversionProfileId: 'shadowdark_compatible_v1',
+      outputProfile: 'shadowdark_compatible',
+      outputPackId: 'shadowdark_private_verify',
+    };
+
+    const result = convertCreature(knightParsed, settings);
+
+    expect(result.specialActions.some(a => a.name === 'Multiattack')).toBe(false);
+    expect(result.specialActions.some(a => a.name === 'Leadership')).toBe(true);
+  });
+
+  it('should NOT collapse multiattack for OSR generic profile', () => {
+    const settings: ConversionSettings = {
+      ...getDefaultSettings(),
+      conversionProfileId: 'osr_generic_v1',
+    };
+
+    const result = convertCreature(knightParsed, settings);
+
+    expect(result.attacks.every(a => a.count === undefined)).toBe(true);
+    expect(result.specialActions.some(a => a.name === 'Multiattack')).toBe(true);
+  });
+
+  it('should collapse a dragon-style three-attack multiattack for SD', () => {
+    const dragon: ParsedCreatureData = {
+      name: 'Young Dragon',
+      ac: 18, hp: 178,
+      movement: '40 ft, fly 80 ft',
+      attacks: [
+        { name: 'Bite', bonus: 10, damage: '2d10+6' },
+        { name: 'Claw', bonus: 10, damage: '2d6+6' },
+      ],
+      specialActions: [
+        { name: 'Multiattack', description: 'The dragon makes three attacks: one with its bite and two with its claws.' },
+      ],
+      multiattackCount: 3,
+      level: 10,
+    };
+
+    const settings: ConversionSettings = {
+      ...getDefaultSettings(),
+      conversionProfileId: 'shadowdark_compatible_v1',
+      outputProfile: 'shadowdark_compatible',
+      outputPackId: 'shadowdark_private_verify',
+    };
+
+    const result = convertCreature(dragon, settings);
+
+    expect(result.attacks[0].count).toBe(3);
+    expect(result.attacks[0].name).toBe('Bite');
+    expect(result.specialActions.some(a => a.name === 'Multiattack')).toBe(false);
+  });
+
+  it('should work for creatures without multiattack (no collapse)', () => {
+    const ogre: ParsedCreatureData = {
+      name: 'Ogre',
+      ac: 11, hp: 59,
+      movement: '40 ft',
+      attacks: [
+        { name: 'Greatclub', bonus: 6, damage: '2d8+4' },
+        { name: 'Javelin', bonus: 6, damage: '2d6+4' },
+      ],
+      level: 2,
+    };
+
+    const settings: ConversionSettings = {
+      ...getDefaultSettings(),
+      conversionProfileId: 'shadowdark_compatible_v1',
+      outputProfile: 'shadowdark_compatible',
+      outputPackId: 'shadowdark_private_verify',
+    };
+
+    const result = convertCreature(ogre, settings);
+
+    expect(result.attacks.every(a => a.count === undefined)).toBe(true);
+    expect(result.attacks.length).toBe(2);
+  });
+});
+
+describe('Shadowdark distance band movement', () => {
+  const base: ParsedCreatureData = {
+    name: 'Test',
+    ac: 13,
+    hp: 20,
+    attacks: [{ name: 'Bite', bonus: 3, damage: '1d6+1' }],
+    level: 3,
+  };
+
+  const sdSettings: ConversionSettings = {
+    ...getDefaultSettings(),
+    conversionProfileId: 'shadowdark_compatible_v1',
+    outputProfile: 'shadowdark_compatible',
+    outputPackId: 'shadowdark_private_verify',
+  };
+
+  it('should convert 30 ft to "near"', () => {
+    const result = convertCreature({ ...base, movement: '30 ft' }, sdSettings);
+    expect(result.movement).toBe('near');
+  });
+
+  it('should convert 40 ft to "near" (not near ×2)', () => {
+    const result = convertCreature({ ...base, movement: '40 ft' }, sdSettings);
+    expect(result.movement).toBe('near');
+  });
+
+  it('should convert 60 ft to "near ×2"', () => {
+    const result = convertCreature({ ...base, movement: '60 ft' }, sdSettings);
+    expect(result.movement).toBe('near ×2');
+  });
+
+  it('should convert "30 ft, fly 60 ft" to distance bands', () => {
+    const result = convertCreature({ ...base, movement: '30 ft, fly 60 ft' }, sdSettings);
+    expect(result.movement).toBe('near, fly near ×2');
+  });
+
+  it('should convert "40 ft, fly 80 ft" (dragon-style)', () => {
+    const result = convertCreature({ ...base, movement: '40 ft, fly 80 ft' }, sdSettings);
+    expect(result.movement).toBe('near, fly far');
+  });
+
+  it('should convert "30 ft, swim 30 ft, climb 20 ft"', () => {
+    const result = convertCreature({ ...base, movement: '30 ft, swim 30 ft, climb 20 ft' }, sdSettings);
+    expect(result.movement).toBe('near, swim near, climb close ×2');
+  });
+
+  it('should convert 5 ft crawl to "close"', () => {
+    const result = convertCreature({ ...base, movement: '5 ft' }, sdSettings);
+    expect(result.movement).toBe('close');
+  });
+
+  it('should skip 0 ft walk speed (e.g. ghost with "0 ft, fly 30 ft")', () => {
+    const result = convertCreature({ ...base, movement: '0 ft, fly 30 ft' }, sdSettings);
+    expect(result.movement).toBe('fly near');
+  });
+
+  it('should NOT convert movement for OSR generic profile', () => {
+    const settings = getDefaultSettings();
+    const result = convertCreature({ ...base, movement: '30 ft' }, settings);
+    expect(result.movement).toBe('30 ft');
+  });
+});
+
 describe('getDefaultSettings', () => {
   it('should return neutral settings', () => {
     const settings = getDefaultSettings();

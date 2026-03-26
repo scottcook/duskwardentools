@@ -45,6 +45,8 @@ export type { ParsedCreatureData };
 /** The canonical converted stat card produced by a pack */
 export interface ConvertedStat {
   name: string;
+  /** Flavor text / physical description of the creature (optional). */
+  description?: string;
   ac: number;
   hp: number;
   movement: string;

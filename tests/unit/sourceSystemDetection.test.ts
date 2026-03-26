@@ -46,6 +46,52 @@ Treasure Type None`);
     expect(['medium', 'high']).toContain(detection?.confidence);
   });
 
+  it('detects Cairn stat blocks', () => {
+    const detection = detectSourceSystem(`Troll
+14 HP, 1 Armor, 14 STR, 12 DEX, 4 WIL, claws (d8+d8), club (d10)
+- Giant, warty humanoids of flesh and bark.
+- **Critical Damage:** They will fully regenerate within 1d4 days.`);
+
+    expect(detection?.system).toBe('cairn');
+    expect(['medium', 'high']).toContain(detection?.confidence);
+  });
+
+  it('detects AD&D 1e stat blocks', () => {
+    const detection = detectSourceSystem(`Orc
+FREQUENCY: Common
+NO. APPEARING: 30-300
+ARMOR CLASS: 6
+MOVE: 9"
+HIT DICE: 1
+% IN LAIR: 35%
+TREASURE TYPE: L
+NO. OF ATTACKS: 1
+DAMAGE/ATTACK: 1-8
+SPECIAL ATTACKS: Nil
+SPECIAL DEFENSES: Nil
+MAGIC RESISTANCE: Standard
+PSIONIC ABILITY: Nil`);
+
+    expect(detection?.system).toBe('adnd1e');
+    expect(['medium', 'high']).toContain(detection?.confidence);
+  });
+
+  it('detects BFRPG stat blocks with Save As', () => {
+    const detection = detectSourceSystem(`Troll
+Armor Class: 16
+Hit Dice: 6+3*
+No. of Attacks: 2 claws/1 bite
+Damage: 1d6/1d6/1d10
+Movement: 40'
+Save As: Fighter 6
+Morale: 10
+Treasure Type: D
+XP: 555`);
+
+    expect(detection?.system).toBe('bfrpg');
+    expect(['medium', 'high']).toContain(detection?.confidence);
+  });
+
   it('falls back to other when evidence is weak', () => {
     const detection = detectSourceSystem('Cave thing\nFast and mean.');
 

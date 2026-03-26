@@ -5,6 +5,7 @@ import { Button, Textarea, Select, Input } from '@/components/ui';
 import { CONVERSION_PROFILE_OPTIONS } from '@/lib/conversion/profiles';
 import type { SourceSystem, CreatureRole, DetectionConfidence } from '@/types';
 import type { ConversionProfileId } from '@/lib/conversion/profiles';
+import { Step1ScanBeta } from './Step1ScanBeta';
 
 const EXAMPLE_STATBLOCK = `Goblin
 AC 15 (leather armor, shield)
@@ -22,12 +23,14 @@ interface Step1SourceProps {
   hasManualSourceSystemSelection: boolean;
   conversionProfileId: ConversionProfileId;
   creatureName: string;
+  creatureDescription: string;
   metadata: { intendedLevel?: number; role?: CreatureRole };
   isValid?: boolean;
   onSourceChange: (text: string) => void;
   onSystemChange: (system: SourceSystem) => void;
   onProfileChange: (profileId: ConversionProfileId) => void;
   onCreatureNameChange: (name: string) => void;
+  onDescriptionChange: (desc: string) => void;
   onMetadataChange: (key: 'intendedLevel' | 'role', value: number | CreatureRole | undefined) => void;
   onNext: () => void;
 }
@@ -36,6 +39,9 @@ const SOURCE_SYSTEM_OPTIONS = [
   { value: '5e', label: '5e / 5.5e' },
   { value: 'bx', label: 'B/X D&D' },
   { value: 'ose', label: 'OSE' },
+  { value: 'bfrpg', label: 'Basic Fantasy RPG' },
+  { value: 'cairn', label: 'Cairn' },
+  { value: 'adnd1e', label: 'AD&D 1e' },
   { value: 'other', label: 'Other / Generic' },
 ];
 
@@ -43,6 +49,9 @@ const SOURCE_SYSTEM_LABELS: Record<SourceSystem, string> = {
   '5e': '5e / 5.5e',
   bx: 'B/X D&D',
   ose: 'OSE',
+  bfrpg: 'Basic Fantasy RPG',
+  cairn: 'Cairn',
+  adnd1e: 'AD&D 1e',
   other: 'Other / Generic',
 };
 
@@ -86,12 +95,14 @@ export function Step1Source({
   hasManualSourceSystemSelection,
   conversionProfileId,
   creatureName,
+  creatureDescription,
   metadata,
   isValid,
   onSourceChange,
   onSystemChange,
   onProfileChange,
   onCreatureNameChange,
+  onDescriptionChange,
   onMetadataChange,
   onNext,
 }: Step1SourceProps) {
@@ -193,6 +204,20 @@ export function Step1Source({
         value={creatureName}
         onChange={(e) => onCreatureNameChange(e.target.value)}
         hint="Leave blank to auto-detect from the stat block."
+      />
+
+      <Textarea
+        label="Description (optional)"
+        placeholder="e.g. Feathered, bird-like creatures with long, sharp beaks."
+        value={creatureDescription}
+        onChange={(e) => onDescriptionChange(e.target.value)}
+        className="min-h-[60px] text-sm"
+        hint="Flavor text or physical description. Auto-filled when detected; feel free to edit or add your own."
+      />
+
+      <Step1ScanBeta
+        hasExistingText={sourceText.trim().length > 0}
+        onAccept={onSourceChange}
       />
 
       {/* ── Source stat block textarea ────────────────────── */}

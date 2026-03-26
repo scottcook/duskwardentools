@@ -33,6 +33,13 @@ export function CreatureCard({ data, showPrintStyles = false }: CreatureCardProp
           )}
         </div>
 
+        {/* Description */}
+        {data.description && (
+          <p className="text-sm italic text-text-muted print:text-gray-600 border-b border-border pb-3">
+            {data.description}
+          </p>
+        )}
+
         {/* Core stats */}
         <div className="grid grid-cols-3 gap-4 text-center border-b border-border pb-3">
           <div>
@@ -56,6 +63,9 @@ export function CreatureCard({ data, showPrintStyles = false }: CreatureCardProp
             <ul className="space-y-1">
               {data.attacks.map((attack, index) => (
                 <li key={index} className="text-sm text-text-primary print:text-black">
+                  {attack.count && attack.count > 1 && (
+                    <span className="font-semibold text-accent print:text-gray-700">{attack.count}× </span>
+                  )}
                   <span className="font-medium">{attack.name}</span>
                   {attack.bonus !== undefined && (
                     <span className="text-accent print:text-gray-700"> +{attack.bonus}</span>

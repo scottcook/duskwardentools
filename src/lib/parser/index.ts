@@ -1,4 +1,4 @@
-import type { ParsedCreatureData, Attack, SpecialAction, SourceSystem } from '@/types';
+import type { ParsedCreatureData, Attack, Ability, SpecialAction, SourceSystem } from '@/types';
 
 interface ParserResult {
   success: boolean;
@@ -30,7 +30,14 @@ export function parseStatBlock(
       break;
     case 'bx':
     case 'ose':
+    case 'bfrpg':
       data = parseOldSchoolStatBlock(text, lines, systemHint);
+      break;
+    case 'cairn':
+      data = parseCairnStatBlock(text, lines);
+      break;
+    case 'adnd1e':
+      data = parseAdnd1eStatBlock(text, lines);
       break;
     default:
       data = parseGenericStatBlock(text, lines, systemHint);
@@ -169,15 +176,17 @@ function extractModernAttacks(text: string): Attack[] {
   const attacks: Attack[] = [];
   let match;
 
-  // Standard 5e format: "Scimitar. Melee Weapon Attack: +4 to hit, reach 5 ft., one target. Hit: 5 (1d6 + 2) slashing damage."
-  const standard5ePattern = /([A-Z][a-z]+(?:\s+[A-Za-z]+)?)\.\s*(?:Melee|Ranged)\s*(?:Weapon\s*)?Attack:\s*\+?(\d+)\s*to\s*hit[^.]*\.\s*Hit:\s*\d+\s*\(([^)]+)\)\s*(\w+)\s*damage/gi;
-  
+  // Standard 5e: "Greatsword. Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 10 (2d6 + 3) slashing damage."
+  // Uses .*? (lazy, same-line) so periods in "5 ft." don't break the match.
+  const standard5ePattern = /([A-Z][A-Za-z]+(?:[- ]+[A-Za-z]+)*)\.\s*(?:Melee|Ranged)\s*(?:Weapon\s*)?Attack:\s*\+?(\d+)\s*to\s*hit.*?Hit:\s*\d+\s*\(([^)]+)\)\s*(\w+)\s*damage/gi;
+
   while ((match = standard5ePattern.exec(text)) !== null) {
     const name = match[1].trim();
+    if (/^multiattack$/i.test(name)) continue;
     const bonus = parseInt(match[2], 10);
     const diceExpression = match[3].replace(/\s+/g, '');
     const damageType = match[4];
-    
+
     if (!attacks.some(a => a.name.toLowerCase() === name.toLowerCase())) {
       attacks.push({
         name,
@@ -194,7 +203,7 @@ function extractModernAttacks(text: string): Attack[] {
       const name = match[1].trim();
       const bonus = parseInt(match[2], 10);
       const damage = match[3].replace(/\s+/g, '') + (match[4] ? ` ${match[4]}` : '');
-      
+
       if (!attacks.some(a => a.name.toLowerCase() === name.toLowerCase())) {
         attacks.push({ name, bonus, damage });
       }
@@ -208,7 +217,7 @@ function extractModernAttacks(text: string): Attack[] {
       const name = match[1].trim();
       const bonus = parseInt(match[2], 10);
       const damage = match[3].replace(/\s+/g, '');
-      
+
       if (!attacks.some(a => a.name.toLowerCase() === name.toLowerCase())) {
         attacks.push({ name, bonus, damage });
       }
@@ -217,12 +226,13 @@ function extractModernAttacks(text: string): Attack[] {
 
   // Generic pattern: look for "+X to hit" with damage
   if (attacks.length === 0) {
-    const genericPattern = /(\w+(?:\s+\w+)?)[.:]?\s*(?:Melee|Ranged)?\s*(?:Weapon\s*)?Attack[:\s]*([+-]\d+)\s*to\s*hit[^.]*?Hit[:\s]+\d+\s*\(([^)]+)\)/gi;
+    const genericPattern = /(\w+(?:\s+\w+)?)[.:]?\s*(?:Melee|Ranged)?\s*(?:Weapon\s*)?Attack[:\s]*([+-]\d+)\s*to\s*hit.*?Hit[:\s]+\d+\s*\(([^)]+)\)/gi;
     while ((match = genericPattern.exec(text)) !== null) {
       const name = match[1].trim();
+      if (/^multiattack$/i.test(name)) continue;
       const bonus = parseInt(match[2], 10);
       const damage = match[3].replace(/\s+/g, '');
-      
+
       if (!attacks.some(a => a.name.toLowerCase() === name.toLowerCase())) {
         attacks.push({ name, bonus, damage });
       }
@@ -231,7 +241,7 @@ function extractModernAttacks(text: string): Attack[] {
 
   // Fallback: look for common weapon names
   if (attacks.length === 0) {
-    const simplePattern = /\b(scimitar|longsword|shortbow|longbow|claw|bite|slam|sword|dagger|staff|bow|crossbow|fist|tentacle|gore|sting|mace|spear|axe|hammer|greataxe|javelin)\b/gi;
+    const simplePattern = /\b(scimitar|longsword|shortsword|greatsword|shortbow|longbow|claw|bite|slam|sword|dagger|staff|bow|crossbow|fist|tentacle|gore|sting|mace|spear|axe|hammer|greataxe|battleaxe|javelin|rapier|flail|halberd|pike|trident|morningstar|glaive|maul|warhammer)\b/gi;
     while ((match = simplePattern.exec(text)) !== null) {
       const name = match[1].charAt(0).toUpperCase() + match[1].slice(1);
       if (!attacks.some(a => a.name.toLowerCase() === name.toLowerCase())) {
@@ -241,6 +251,49 @@ function extractModernAttacks(text: string): Attack[] {
   }
 
   return attacks.slice(0, 5);
+}
+
+const MULTIATTACK_WORD_MAP: Record<string, number> = {
+  one: 1, two: 2, three: 3, four: 4, five: 5, six: 6,
+  '1': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6,
+};
+
+function extractMultiattackCount(specialActions: SpecialAction[]): number | undefined {
+  const multiattack = specialActions.find(
+    a => a.name.toLowerCase() === 'multiattack',
+  );
+  if (!multiattack) return undefined;
+
+  const desc = multiattack.description;
+
+  // "makes two melee attacks", "makes three attacks", "makes two longsword attacks"
+  const makesMatch = desc.match(
+    /makes?\s+(\w+)\s+(?:\w+\s+){0,3}attacks?\b/i,
+  );
+  if (makesMatch) {
+    const count = MULTIATTACK_WORD_MAP[makesMatch[1].toLowerCase()];
+    if (count) return count;
+  }
+
+  // "attacks twice" / "attacks three times"
+  const timesMatch = desc.match(/attacks?\s+(twice|thrice|two|three|four|five|six|\d+)\s*(?:times?)?\b/i);
+  if (timesMatch) {
+    const wordMap: Record<string, number> = { ...MULTIATTACK_WORD_MAP, twice: 2, thrice: 3 };
+    const count = wordMap[timesMatch[1].toLowerCase()];
+    if (count) return count;
+  }
+
+  // Compound: "one bite attack and two claw attacks" → sum them
+  const compoundParts = desc.match(
+    /(\w+)\s+(?:\w+\s+)?attacks?\s+and\s+(\w+)\s+(?:\w+\s+)?attacks?/i,
+  );
+  if (compoundParts) {
+    const a = MULTIATTACK_WORD_MAP[compoundParts[1].toLowerCase()] ?? 0;
+    const b = MULTIATTACK_WORD_MAP[compoundParts[2].toLowerCase()] ?? 0;
+    if (a + b > 1) return a + b;
+  }
+
+  return undefined;
 }
 
 function extractTHAC0(text: string): { thac0?: number; attackBonus?: number } {
@@ -400,6 +453,44 @@ function extractLevel(text: string, cr?: string, hdNotation?: string): number | 
   return undefined;
 }
 
+/**
+ * Extract flavor / physical description from lines that don't match stat patterns.
+ * Works best for OSE, B/X, and Cairn where a short description sentence follows
+ * (or precedes) the stat table.
+ */
+function extractDescription(lines: string[]): string | undefined {
+  const STAT_LINE_RE = /^(?:AC|Armor|Armour|HP|Hit|Speed|Move|MV|STR|DEX|CON|INT|WIS|CHA|WIL|CR|Challenge|Skills|Senses|Languages|Saving|Save|THAC0|HD|Att|ML|Morale|AL|XP|No\.|Treasure|Frequency|Number|Size|Alignment|Damage|Special|Magic|Psionic|%\s*In)/i;
+  const SECTION_RE = /^(?:Actions|Reactions|Traits|Legendary|Lair|Bonus|Abilities)$/i;
+  const ABILITY_LINE_RE = /^[A-Z][A-Za-z' -]{1,40}[.:]\s+.+/;
+  const STAT_INLINE_RE = /\b(?:\d+d\d+|\+\d+\s*to\s*hit|AC\s*\d|HP\s*\d|THAC0|Save\s+As|Saving\s+Throws)\b/i;
+
+  const candidates: string[] = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.length < 15) continue;
+    if (STAT_LINE_RE.test(line)) continue;
+    if (SECTION_RE.test(line)) continue;
+    if (ABILITY_LINE_RE.test(line)) continue;
+    if (STAT_INLINE_RE.test(line)) continue;
+    if (/^\d+\s*(?:[\(\[]|$)/.test(line)) continue;
+    if (/^[-–—*•]/.test(line)) {
+      candidates.push(line.replace(/^[-–—*•]\s*/, ''));
+      continue;
+    }
+    if (/^[A-Z]/.test(line) || /^[a-z]/.test(line)) {
+      candidates.push(line);
+    }
+  }
+
+  const desc = candidates
+    .filter(l => /[a-z]/.test(l) && l.length >= 15)
+    .join(' ')
+    .trim();
+
+  return desc.length >= 15 ? desc : undefined;
+}
+
 function isSectionHeader(line: string): boolean {
   return /^(actions|reactions|bonus actions|legendary actions|lair actions|traits?)$/i.test(line);
 }
@@ -430,7 +521,8 @@ function extractSpecialActions(text: string): SpecialAction[] {
     const description = match[2].trim();
 
     if (isCommonHeader(name)) continue;
-    if (/^(?:save|saves|saving throws?|save as|armor class|armour class|hit dice|movement|move|morale|thac0)$/i.test(name)) continue;
+    if (/^(?:save|saves|saving throws?|save as|armor class|armour class|hit dice|hit points?|movement|move|morale|thac0|damage|treasure type|frequency|xp|alignment|size|no|intelligence|psionic ability|magic resistance|special attacks?|special defenses?)$/i.test(name)) continue;
+    if (name.length < 3) continue;
     if (/(?:attack:|\+\d+\s*to\s*hit)/i.test(description) && section === 'actions') continue;
 
     const rechargeMatch = description.match(/Recharge\s*(\d+[-–]\d+|\d+)/i);
@@ -446,6 +538,64 @@ function extractSpecialActions(text: string): SpecialAction[] {
   }
 
   return actions;
+}
+
+/**
+ * Extract abilities from unstructured prose paragraphs.
+ * Looks for sentences containing common ability keywords (e.g. "regenerat", "immune",
+ * "resist", "vulnerab", "paralyz") and groups them into named special actions.
+ * Used as a supplement when `extractSpecialActions` finds few/no structured entries.
+ */
+const PROSE_ABILITY_PATTERNS: { name: string; pattern: RegExp }[] = [
+  { name: 'Regeneration', pattern: /\bregenerat\w*/i },
+  { name: 'Immunity', pattern: /\bimmun\w+\b/i },
+  { name: 'Resistance', pattern: /\bresistan\w+\b/i },
+  { name: 'Vulnerability', pattern: /\bvulnerab\w+\b/i },
+  { name: 'Paralysis', pattern: /\bparalyz\w*|paralys\w*/i },
+  { name: 'Poison', pattern: /\bpoison\w*\b/i },
+  { name: 'Petrification', pattern: /\bpetrif\w+\b/i },
+  { name: 'Drain', pattern: /\benergy\s+drain|level\s+drain/i },
+  { name: 'Charm', pattern: /\bcharm\w*\b/i },
+  { name: 'Fear', pattern: /\bfear\b|frightened|cause fear/i },
+  { name: 'Swallow', pattern: /\bswallow\w*\b/i },
+  { name: 'Web', pattern: /\bweb\b/i },
+  { name: 'Breath Weapon', pattern: /\bbreath\s+weapon|breathe\s+fire|breathe\s+lightning/i },
+  { name: 'Darkvision', pattern: /\bdarkvision|infravision/i },
+  { name: 'Surprise', pattern: /\bsurpris\w+\b.*\b\d+\b/i },
+  { name: 'Undead', pattern: /\bundead\b/i },
+];
+
+function extractProseAbilities(lines: string[], existingActions: SpecialAction[]): SpecialAction[] {
+  const existingNames = new Set(existingActions.map(a => a.name.toLowerCase()));
+  const found: SpecialAction[] = [];
+  const usedNames = new Set<string>();
+
+  const STAT_LINE_RE = /^(?:AC|Armor|Armour|HP|Hit|Speed|Move|MV|STR|DEX|CON|INT|WIS|CHA|WIL|CR|Challenge|Saving|Save|THAC0|HD|Att|ML|Morale|AL|XP|No\.|Treasure|Frequency|Number|Size|Alignment|Damage|Special|Magic|Psionic|%\s*In)/i;
+
+  for (const line of lines) {
+    if (line.length < 30) continue;
+    if (STAT_LINE_RE.test(line)) continue;
+    if (/^[A-Z][A-Za-z' -]{1,40}[.:]\s+.+/.test(line)) continue;
+
+    for (const { name, pattern } of PROSE_ABILITY_PATTERNS) {
+      if (usedNames.has(name)) continue;
+      if (existingNames.has(name.toLowerCase())) continue;
+
+      if (pattern.test(line)) {
+        const sentences = line.match(/[^.!?]+[.!?]+/g);
+        const relevantSentences = sentences?.filter(s => pattern.test(s));
+        const description = relevantSentences?.join(' ').trim() || line.trim();
+        if (description.length >= 15) {
+          found.push({ name, description });
+          usedNames.add(name);
+        }
+      }
+    }
+
+    if (found.length >= 3) break;
+  }
+
+  return found;
 }
 
 function isCommonHeader(text: string): boolean {
@@ -486,6 +636,8 @@ function parseModernStatBlock(
   lines: string[],
   systemHint?: SourceSystem,
 ): ParsedCreatureData {
+  const specialActions = extractSpecialActions(text);
+
   const data: ParsedCreatureData = {
     system: systemHint,
     name: lines.length > 0 ? extractName(lines[0]) : undefined,
@@ -495,7 +647,9 @@ function parseModernStatBlock(
     attacks: extractModernAttacks(text),
     cr: extractCR(text),
     saves: extractSaves(text),
-    specialActions: extractSpecialActions(text),
+    specialActions,
+    multiattackCount: extractMultiattackCount(specialActions),
+    description: extractDescription(lines),
   };
 
   data.level = extractLevel(text, data.cr);
@@ -523,10 +677,19 @@ function parseOldSchoolStatBlock(
     level: extractLevel(text, extractCR(text), hitDice.notation),
     morale: extractMorale(text),
     thac0: thac0.thac0,
+    description: extractDescription(lines),
   };
 
   if (!data.attacks?.length) {
     data.attacks = extractModernAttacks(text);
+  }
+
+  // Supplement with prose-extracted abilities for systems like BFRPG
+  if ((data.specialActions?.length ?? 0) < 2) {
+    const proseAbilities = extractProseAbilities(lines, data.specialActions ?? []);
+    if (proseAbilities.length > 0) {
+      data.specialActions = [...(data.specialActions ?? []), ...proseAbilities];
+    }
   }
 
   return data;
@@ -545,6 +708,178 @@ function fillMissing<T extends object>(target: T, source: Partial<T>): T {
     }
   }
   return next;
+}
+
+// ── Cairn parser ──────────────────────────────────────────────────────────────
+// Cairn stat blocks: "X HP, Y Armor, Z STR, W DEX, V WIL, attack (dN)" + bullet points
+
+function parseCairnStatBlock(text: string, lines: string[]): ParsedCreatureData {
+  const name = lines.length > 0 ? extractName(lines[0]) : undefined;
+  const attacks: Attack[] = [];
+  const bulletPoints: string[] = [];
+  let hp: number | undefined;
+  let ac: number | undefined;
+  let str: number | undefined;
+  let dex: number | undefined;
+  let wil: number | undefined;
+  let criticalDamage: string | undefined;
+
+  // First non-name line is usually the stat line
+  const statLine = lines.find((l, i) => i > 0 && /\d+\s*HP\b/i.test(l)) ?? '';
+
+  const hpMatch = statLine.match(/(\d+)\s*HP\b/i);
+  if (hpMatch) hp = parseInt(hpMatch[1], 10);
+
+  const armorMatch = statLine.match(/(\d+)\s*Armor\b/i);
+  ac = armorMatch ? 10 + parseInt(armorMatch[1], 10) : 10;
+
+  const strMatch = statLine.match(/(\d+)\s*STR\b/i);
+  if (strMatch) str = parseInt(strMatch[1], 10);
+
+  const dexMatch = statLine.match(/(\d+)\s*DEX\b/i);
+  if (dexMatch) dex = parseInt(dexMatch[1], 10);
+
+  const wilMatch = statLine.match(/(\d+)\s*WIL\b/i);
+  if (wilMatch) wil = parseInt(wilMatch[1], 10);
+
+  // Extract attacks from stat line: "sword (d8)", "claws (d6+d6)", "bite (d10, blast)"
+  const atkPattern = /(\w+(?:\s+\w+)?)\s*\(\s*(d\d+(?:\+d\d+)?(?:\s*,\s*[^)]+)?)\s*\)/gi;
+  let atkMatch;
+  while ((atkMatch = atkPattern.exec(statLine)) !== null) {
+    const atkName = atkMatch[1].trim();
+    if (/^(?:HP|STR|DEX|WIL|Armor)$/i.test(atkName)) continue;
+    attacks.push({ name: atkName, damage: atkMatch[2].trim() });
+  }
+
+  // Collect bullet points and look for Critical Damage
+  for (const line of lines) {
+    const stripped = line.replace(/^[-–—*•]\s*/, '').trim();
+    if (/^\*?\*?Critical\s*Damage\b\*?\*?[:\s]/i.test(stripped)) {
+      criticalDamage = stripped.replace(/^\*?\*?Critical\s*Damage\b\*?\*?[:\s]*/i, '').trim();
+      continue;
+    }
+    if (/^[-–—*•]/.test(line) && stripped.length > 10) {
+      bulletPoints.push(stripped);
+    }
+  }
+
+  const specialActions: SpecialAction[] = [];
+  if (criticalDamage) {
+    specialActions.push({ name: 'Critical Damage', description: criticalDamage });
+  }
+
+  const description = bulletPoints.length > 0 ? bulletPoints.join(' ') : undefined;
+
+  const abilities: Ability[] = [];
+  if (str !== undefined) abilities.push({ name: 'STR', modifier: Math.floor((str - 10) / 2) });
+  if (dex !== undefined) abilities.push({ name: 'DEX', modifier: Math.floor((dex - 10) / 2) });
+  if (wil !== undefined) abilities.push({ name: 'WIL', modifier: Math.floor((wil - 10) / 2) });
+
+  const level = hp != null ? (hp <= 3 ? 1 : hp <= 6 ? 2 : hp <= 10 ? 3 : hp <= 14 ? 4 : 5) : undefined;
+
+  return {
+    system: 'cairn',
+    name,
+    ac,
+    hp,
+    movement: 'near',
+    attacks,
+    abilities,
+    specialActions,
+    level,
+    morale: wil != null ? Math.min(12, Math.max(2, Math.round(wil * 12 / 18))) : undefined,
+    description,
+  };
+}
+
+// ── AD&D 1e parser ────────────────────────────────────────────────────────────
+// 16-field structured stat blocks with descending AC and movement in inches
+
+function parseAdnd1eStatBlock(text: string, lines: string[]): ParsedCreatureData {
+  const name = lines.length > 0 ? extractName(lines[0]) : undefined;
+
+  function fieldVal(pattern: RegExp): string | undefined {
+    const m = text.match(pattern);
+    return m?.[1]?.trim();
+  }
+
+  // AC — descending; convert to ascending (20 - descending)
+  const acRaw = fieldVal(/\bARMOR\s*CLASS\b\s*[:=]?\s*(-?\d+)/i)
+    ?? fieldVal(/\bAC\b\s*[:=]?\s*(-?\d+)/i);
+  const descendingAC = acRaw != null ? parseInt(acRaw, 10) : undefined;
+  const ac = descendingAC != null ? 20 - descendingAC : undefined;
+
+  // HD
+  const hdRaw = fieldVal(/\bHIT\s*DICE\b\s*[:=]?\s*([\d+/]+)/i)
+    ?? fieldVal(/\bHD\b\s*[:=]?\s*([\d+/]+)/i);
+  let hp: number | undefined;
+  if (hdRaw) {
+    const hdNum = parseFloat(hdRaw);
+    if (!isNaN(hdNum)) hp = Math.round(hdNum * 4.5);
+  }
+
+  // Movement — convert inches to feet (1" = 10 feet for tactical)
+  const moveRaw = fieldVal(/\bMOVE\b\s*[:=]?\s*([\d"/ ]+)/i);
+  let movement = '30 ft';
+  if (moveRaw) {
+    const inchMatch = moveRaw.match(/(\d+)"/);
+    if (inchMatch) {
+      const feet = parseInt(inchMatch[1], 10) * 10;
+      movement = `${feet} ft`;
+    }
+    const flyMatch = moveRaw.match(/\/\s*(\d+)"/);
+    if (flyMatch) {
+      const flyFeet = parseInt(flyMatch[1], 10) * 10;
+      movement += `, fly ${flyFeet} ft`;
+    }
+  }
+
+  // Attacks
+  const numAtk = parseInt(fieldVal(/\bNO\.?\s*OF\s*ATTACKS?\b\s*[:=]?\s*(\d+)/i) ?? '1', 10);
+  const dmgRaw = fieldVal(/\bDAMAGE\s*\/\s*ATTACK\b\s*[:=]?\s*(.+)/i);
+  const attacks: Attack[] = [];
+  if (dmgRaw) {
+    const dmgParts = dmgRaw.split(/\s*\/\s*/);
+    for (let i = 0; i < Math.min(numAtk, dmgParts.length); i++) {
+      attacks.push({ name: `Attack ${i + 1}`, damage: dmgParts[i].trim() });
+    }
+  }
+  if (attacks.length === 0 && numAtk > 0) {
+    attacks.push({ name: 'Attack', damage: '1d6' });
+  }
+
+  // Special attacks/defenses as special actions
+  const specialActions: SpecialAction[] = [];
+  const specialAtk = fieldVal(/\bSPECIAL\s*ATTACKS?\b\s*[:=]?\s*(.+)/i);
+  if (specialAtk && !/^nil$/i.test(specialAtk)) {
+    specialActions.push({ name: 'Special Attacks', description: specialAtk });
+  }
+  const specialDef = fieldVal(/\bSPECIAL\s*DEFENSES?\b\s*[:=]?\s*(.+)/i);
+  if (specialDef && !/^nil$/i.test(specialDef)) {
+    specialActions.push({ name: 'Special Defenses', description: specialDef });
+  }
+
+  const magicRes = fieldVal(/\bMAGIC\s*RESISTANCE\b\s*[:=]?\s*(.+)/i);
+  if (magicRes && !/^(?:nil|standard)$/i.test(magicRes)) {
+    specialActions.push({ name: 'Magic Resistance', description: magicRes });
+  }
+
+  // Level from HD
+  const level = hdRaw ? Math.max(1, Math.round(parseFloat(hdRaw))) : undefined;
+
+  const description = extractDescription(lines);
+
+  return {
+    system: 'adnd1e',
+    name,
+    ac,
+    hp,
+    movement,
+    attacks,
+    specialActions,
+    level,
+    description,
+  };
 }
 
 function parseGenericStatBlock(

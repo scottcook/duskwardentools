@@ -176,6 +176,89 @@ function buildAttacks(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Distance band conversion (Shadowdark-style: close / near / far)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function feetToDistanceBand(feet: number): string {
+  if (feet <= 5)  return 'close';
+  if (feet <= 20) return 'close ×2';
+  if (feet <= 45) return 'near';
+  if (feet <= 60) return 'near ×2';
+  if (feet <= 90) return 'far';
+  return 'far ×2';
+}
+
+function convertMovementToDistanceBands(movement: string): string {
+  const segments = movement.split(',').map(s => s.trim());
+  const converted: string[] = [];
+
+  for (const segment of segments) {
+    const typed = segment.match(
+      /^(fly|swim|climb|burrow|hover)\s+(\d+)\s*(?:ft\.?|feet|')/i,
+    );
+    if (typed) {
+      const feet = parseInt(typed[2], 10);
+      if (feet > 0) converted.push(`${typed[1].toLowerCase()} ${feetToDistanceBand(feet)}`);
+      continue;
+    }
+    const plain = segment.match(/(\d+)\s*(?:ft\.?|feet|')/i);
+    if (plain) {
+      const feet = parseInt(plain[1], 10);
+      if (feet > 0) converted.push(feetToDistanceBand(feet));
+      continue;
+    }
+    converted.push(segment);
+  }
+
+  return converted.join(', ') || 'close';
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Multiattack collapse (produces one primary attack with a count)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const RANGED_WEAPON_RE = /\b(bow|crossbow|sling|dart|net|thrown|shortbow|longbow)\b/i;
+
+function collapseMultiattackAttacks(
+  attacks: Attack[],
+  multiattackCount: number,
+  ab: number,
+  effectiveDPR: number,
+): Attack[] {
+  if (attacks.length === 0) {
+    return [{
+      name: 'Attack',
+      bonus: ab,
+      damage: scaleDamageToTarget(effectiveDPR / multiattackCount),
+      count: multiattackCount,
+    }];
+  }
+
+  const melee = attacks.filter(a => !RANGED_WEAPON_RE.test(a.name));
+  const ranged = attacks.filter(a => RANGED_WEAPON_RE.test(a.name));
+  const primary = melee[0] ?? attacks[0];
+
+  const result: Attack[] = [{
+    name: primary.name,
+    bonus: primary.bonus ?? ab,
+    damage: scaleDamageToTarget(effectiveDPR / multiattackCount),
+    count: multiattackCount,
+  }];
+
+  for (const alt of ranged) {
+    if (alt.name.toLowerCase() !== primary.name.toLowerCase()) {
+      result.push({
+        name: alt.name,
+        bonus: alt.bonus ?? ab,
+        damage: alt.damage ?? scaleDamageToTarget(effectiveDPR),
+      });
+    }
+  }
+
+  return result;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Traits extraction
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -245,9 +328,37 @@ export function convertCreature(
     settings.deadliness
   );
 
+  // Distance band conversion (e.g. Shadowdark)
+  const movement = profile.useDistanceBands
+    ? convertMovementToDistanceBands(parsed.movement || '30 ft')
+    : (parsed.movement || '30 ft');
+
+  // Multiattack collapse (e.g. Shadowdark "ATK 2 sword +3 (1d8)")
+  if (
+    profile.collapseMultiattack &&
+    parsed.multiattackCount &&
+    parsed.multiattackCount > 1
+  ) {
+    const consolidated = collapseMultiattackAttacks(
+      parsed.attacks ?? [],
+      parsed.multiattackCount,
+      abFinal,
+      targets.dprTarget * settings.deadliness,
+    );
+    attacks.length = 0;
+    attacks.push(...consolidated);
+  }
+
   const saves    = parsed.saves ?? `+${tier + 2} vs physical effects`;
   const traits   = extractTraits(parsed);
-  const specialActions = parsed.specialActions?.slice(0, 3) ?? [];
+  let specialActions = parsed.specialActions?.slice(0, 3) ?? [];
+
+  if (profile.collapseMultiattack && parsed.multiattackCount) {
+    specialActions = specialActions.filter(
+      a => a.name.toLowerCase() !== 'multiattack',
+    );
+  }
+
   const morale   = parsed.morale ?? targets.moraleTarget ?? 0;
   const lootNotes = generateLootNotes(tier);
 
@@ -279,9 +390,10 @@ export function convertCreature(
 
   return {
     name: parsed.name || 'Unnamed Creature',
+    description: parsed.description,
     ac: acFinal,
     hp: hpFinal,
-    movement: parsed.movement || '30 ft',
+    movement,
     attacks,
     saves,
     traits,

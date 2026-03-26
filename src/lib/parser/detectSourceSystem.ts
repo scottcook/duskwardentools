@@ -12,7 +12,7 @@ export interface SourceSystemDetection {
 
 interface HeuristicSet {
   system: Exclude<SourceSystem, 'other'>;
-  signals: Array<{ label: string; pattern: RegExp; weight: number }>;
+  signals: { label: string; pattern: RegExp; weight: number }[];
 }
 
 const HEURISTICS: HeuristicSet[] = [
@@ -58,6 +58,44 @@ const HEURISTICS: HeuristicSet[] = [
       { label: 'Morale wording', pattern: /\bMorale\b/i, weight: 1 },
       { label: 'HD abbreviation', pattern: /\bHD\b/i, weight: 1 },
       { label: 'Attacks wording', pattern: /\bAttacks?\b\s*[:=]?\s*\d+/i, weight: 1 },
+    ],
+  },
+  {
+    system: 'bfrpg',
+    signals: [
+      { label: 'Save As', pattern: /\bSave\s+As\b/i, weight: 4 },
+      { label: 'No. of Attacks', pattern: /\bNo\.\s*of\s*Attacks?\b/i, weight: 3 },
+      { label: 'Ascending AC without brackets', pattern: /\bArmor\s*Class\s*[:=]?\s*\d+(?:\s*\(\d+\))?/i, weight: 2 },
+      { label: 'Movement in feet', pattern: /\bMovement\b\s*[:=]?\s*\d+'/i, weight: 2 },
+      { label: 'XP explicit', pattern: /\bXP\b\s*[:=]?\s*[\d,]+/i, weight: 2 },
+      { label: 'Morale wording', pattern: /\bMorale\b/i, weight: 1 },
+      { label: 'Treasure Type', pattern: /\bTreasure\s*Type\b/i, weight: 1 },
+      { label: 'HD abbreviation', pattern: /\bHit\s*Dice\b/i, weight: 1 },
+    ],
+  },
+  {
+    system: 'cairn',
+    signals: [
+      { label: 'HP + STR/DEX/WIL in one line', pattern: /\d+\s*HP\b.*\b(?:STR|DEX|WIL)\b/i, weight: 5 },
+      { label: 'WIL ability', pattern: /\bWIL\b/i, weight: 3 },
+      { label: 'Critical Damage', pattern: /\bCritical\s*Damage\b/i, weight: 4 },
+      { label: 'Cairn-style Armor', pattern: /\d+\s*Armor\b/i, weight: 2 },
+      { label: 'Damage die in parens', pattern: /\(\s*d\d+\s*\)/i, weight: 1 },
+    ],
+  },
+  {
+    system: 'adnd1e',
+    signals: [
+      { label: 'FREQUENCY field', pattern: /\bFREQUENCY\b\s*[:=]/i, weight: 4 },
+      { label: '% IN LAIR field', pattern: /%\s*IN\s*LAIR\b/i, weight: 5 },
+      { label: 'TREASURE TYPE field', pattern: /\bTREASURE\s*TYPE\b/i, weight: 3 },
+      { label: 'MAGIC RESISTANCE field', pattern: /\bMAGIC\s*RESISTANCE\b/i, weight: 3 },
+      { label: 'PSIONIC ABILITY', pattern: /\bPSIONIC\s*ABILITY\b/i, weight: 4 },
+      { label: 'SPECIAL ATTACKS field', pattern: /\bSPECIAL\s*ATTACKS?\b\s*[:=]/i, weight: 2 },
+      { label: 'SPECIAL DEFENSES field', pattern: /\bSPECIAL\s*DEFENSES?\b\s*[:=]/i, weight: 2 },
+      { label: 'NO. OF ATTACKS field', pattern: /\bNO\.\s*OF\s*ATTACKS?\b/i, weight: 2 },
+      { label: 'DAMAGE/ATTACK field', pattern: /\bDAMAGE\s*\/\s*ATTACK\b/i, weight: 3 },
+      { label: 'Movement in inches', pattern: /\bMOVE\b\s*[:=]?\s*\d+"/i, weight: 3 },
     ],
   },
 ];

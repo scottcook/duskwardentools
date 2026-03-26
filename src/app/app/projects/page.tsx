@@ -35,12 +35,15 @@ export default function ProjectsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
           <h1 className="text-2xl font-bold text-text-primary">Projects</h1>
           <p className="mt-1 text-text-muted">Organize your creatures and notes by campaign or conversion job.</p>
         </div>
-        <CreateProjectButton onCreated={triggerRefresh} />
+        <CreateProjectButton
+          onCreated={triggerRefresh}
+          className="w-full shrink-0 justify-center sm:w-auto"
+        />
       </div>
 
       {loading ? (

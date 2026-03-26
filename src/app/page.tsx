@@ -101,7 +101,7 @@ export default function LandingPage() {
               <div className="mt-8 flex flex-col sm:flex-row items-start gap-4">
                 <TrackedLink
                   href="/app/convert"
-                  className="inline-flex items-center justify-center px-6 py-3 bg-accent text-bg-base font-semibold rounded-xl hover:bg-accent-hover transition-colors focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-bg-base"
+                  className="inline-flex w-full sm:w-auto items-center justify-center px-6 py-3 bg-accent text-bg-base font-semibold rounded-xl hover:bg-accent-hover transition-colors focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-bg-base"
                   eventName="marketing_cta_click"
                   eventProperties={{ location: 'home_hero', destination: 'convert', style: 'primary' }}
                 >

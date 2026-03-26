@@ -2,7 +2,7 @@ export type EntryType = 'creature' | 'adventure_note';
 
 export type CreatureRole = 'brute' | 'skirmisher' | 'caster' | 'boss' | 'minion' | 'support';
 
-export type SourceSystem = '5e' | 'bx' | 'ose' | 'other';
+export type SourceSystem = '5e' | 'bx' | 'ose' | 'bfrpg' | 'cairn' | 'adnd1e' | 'other';
 
 export type ThreatTier = 1 | 2 | 3 | 4 | 5;
 export type DetectionConfidence = 'low' | 'medium' | 'high';
@@ -87,6 +87,10 @@ export interface ParsedCreatureData {
   morale?: number;
   thac0?: number;
   system?: SourceSystem;
+  /** Parsed from "Multiattack. The X makes N attacks." lines — the per-round count. */
+  multiattackCount?: number;
+  /** Flavor text / physical description of the creature. */
+  description?: string;
 }
 
 export interface Attack {
@@ -94,6 +98,8 @@ export interface Attack {
   bonus?: number;
   damage?: string;
   description?: string;
+  /** Number of times this attack is made per round (e.g. multiattack). Absent or 1 = single. */
+  count?: number;
 }
 
 export interface Ability {
@@ -140,6 +146,8 @@ export interface ConversionTuning {
 
 export interface OutputCreatureData {
   name: string;
+  /** Flavor text / physical description of the creature (optional). */
+  description?: string;
   ac: number;
   hp: number;
   movement: string;
@@ -208,6 +216,8 @@ export interface WizardState {
   detectedSourceSystemConfidence?: DetectionConfidence;
   hasManualSourceSystemSelection: boolean;
   creatureName: string;
+  /** Optional user-provided or auto-extracted flavor description */
+  creatureDescription: string;
   metadata: {
     intendedLevel?: number;
     role?: CreatureRole;

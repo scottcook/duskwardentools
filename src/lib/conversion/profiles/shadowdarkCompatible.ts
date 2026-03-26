@@ -29,6 +29,8 @@ export const shadowdarkCompatibleProfile: ConversionProfile = {
     'Independent tool; not affiliated with The Arcane Library.',
   showMorale: false,
   showReaction: false,
+  useDistanceBands: true,
+  collapseMultiattack: true,
 
   // OUR OWN numeric targets — lean HP, moderate AC, crisp DPR
   baseTierTargets: {

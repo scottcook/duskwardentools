@@ -5,8 +5,13 @@ import { parseStatBlock, createEmptyParsedData } from '@/lib/parser';
 
 describe('parseStatBlock', () => {
   const goblin5e = readFileSync(join(process.cwd(), 'tests/unit/fixtures/goblin-5e.txt'), 'utf8');
+  const knight5e = readFileSync(join(process.cwd(), 'tests/unit/fixtures/knight-5e.txt'), 'utf8');
   const skeletonOse = readFileSync(join(process.cwd(), 'tests/unit/fixtures/skeleton-ose.txt'), 'utf8');
   const orcBx = readFileSync(join(process.cwd(), 'tests/unit/fixtures/orc-bx.txt'), 'utf8');
+  const trollCairn = readFileSync(join(process.cwd(), 'tests/unit/fixtures/troll-cairn.txt'), 'utf8');
+  const orcAdnd1e = readFileSync(join(process.cwd(), 'tests/unit/fixtures/orc-adnd1e.txt'), 'utf8');
+  const stirgeOse = readFileSync(join(process.cwd(), 'tests/unit/fixtures/stirge-ose.txt'), 'utf8');
+  const trollBfrpg = readFileSync(join(process.cwd(), 'tests/unit/fixtures/troll-bfrpg.txt'), 'utf8');
 
   it('should return empty data for empty input', () => {
     const result = parseStatBlock('');
@@ -65,6 +70,79 @@ describe('parseStatBlock', () => {
     expect(result.data.attacks).toHaveLength(2);
     expect(result.data.specialActions?.[0]?.name).toBe('Nimble Escape');
     expect(result.confidence).toBeGreaterThan(0.5);
+  });
+
+  it('should parse 5e attacks with "reach X ft." and "range X/Y ft." correctly', () => {
+    const result = parseStatBlock(goblin5e, '5e');
+
+    expect(result.data.attacks!.length).toBe(2);
+    expect(result.data.attacks![0].name).toBe('Scimitar');
+    expect(result.data.attacks![0].bonus).toBe(4);
+    expect(result.data.attacks![0].damage).toContain('1d6');
+    expect(result.data.attacks![1].name).toBe('Shortbow');
+    expect(result.data.attacks![1].bonus).toBe(4);
+  });
+
+  it('should parse the Knight with Greatsword, Crossbow, and multiattack count', () => {
+    const result = parseStatBlock(knight5e, '5e');
+
+    expect(result.success).toBe(true);
+    expect(result.data.name).toBe('Knight');
+    expect(result.data.ac).toBe(18);
+    expect(result.data.hp).toBe(52);
+    expect(result.data.cr).toBe('3');
+
+    // Both weapon attacks must be parsed with bonus + damage
+    expect(result.data.attacks!.length).toBe(2);
+    expect(result.data.attacks![0].name).toBe('Greatsword');
+    expect(result.data.attacks![0].bonus).toBe(5);
+    expect(result.data.attacks![0].damage).toContain('2d6');
+    expect(result.data.attacks![1].name).toBe('Heavy Crossbow');
+    expect(result.data.attacks![1].bonus).toBe(2);
+
+    // Multiattack count extracted
+    expect(result.data.multiattackCount).toBe(2);
+
+    // Multiattack is still in specialActions (engine decides whether to keep it)
+    expect(result.data.specialActions?.some(a => a.name === 'Multiattack')).toBe(true);
+  });
+
+  it('should extract multiattack count from "makes two longsword attacks"', () => {
+    const block = `Veteran
+AC 17
+HP 58
+Speed 30 ft.
+Actions
+Multiattack. The veteran makes two longsword attacks. If it has a shortsword drawn, it can also make a shortsword attack.
+Longsword. Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 7 (1d8 + 3) slashing damage.
+Shortsword. Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 6 (1d6 + 3) piercing damage.
+`;
+    const result = parseStatBlock(block, '5e');
+    expect(result.data.multiattackCount).toBe(2);
+    expect(result.data.attacks!.length).toBeGreaterThanOrEqual(2);
+    expect(result.data.attacks![0].name).toBe('Longsword');
+  });
+
+  it('should extract multiattack count from compound "one bite and two claw"', () => {
+    const block = `Young Dragon
+AC 18
+HP 178
+Speed 40 ft., fly 80 ft.
+Actions
+Multiattack. The dragon makes three attacks: one bite attack and two claw attacks.
+Bite. Melee Weapon Attack: +10 to hit, reach 10 ft., one target. Hit: 17 (2d10 + 6) piercing damage.
+Claw. Melee Weapon Attack: +10 to hit, reach 5 ft., one target. Hit: 13 (2d6 + 6) slashing damage.
+`;
+    const result = parseStatBlock(block, '5e');
+    expect(result.data.multiattackCount).toBe(3);
+    expect(result.data.attacks!.length).toBe(2);
+    expect(result.data.attacks![0].name).toBe('Bite');
+    expect(result.data.attacks![1].name).toBe('Claw');
+  });
+
+  it('should not set multiattackCount when no Multiattack action exists', () => {
+    const result = parseStatBlock(goblin5e, '5e');
+    expect(result.data.multiattackCount).toBeUndefined();
   });
 
   it('should extract attacks with bonus and damage', () => {
@@ -144,6 +222,70 @@ Undead: Make no noise until they attack. Immune to effects that affect living cr
     const result = parseStatBlock('Orc\nAC 6 [13], HD 1, Move 120\' (40\'), Attacks 1 weapon (1d6), Save As Fighter: 1, Morale 8', 'bx');
 
     expect(result.data.saves).toBe('Save As Fighter: 1');
+  });
+
+  // ── Cairn parser ────────────────────────────────────────────────
+  it('should parse Cairn stat block (Troll)', () => {
+    const result = parseStatBlock(trollCairn, 'cairn');
+    expect(result.success).toBe(true);
+    expect(result.data.name).toBe('Troll');
+    expect(result.data.hp).toBe(14);
+    expect(result.data.ac).toBe(11); // 10 + 1 Armor
+    expect(result.data.attacks).toBeDefined();
+    expect(result.data.attacks!.length).toBeGreaterThanOrEqual(2);
+    expect(result.data.attacks!.some(a => a.name === 'claws')).toBe(true);
+    expect(result.data.attacks!.some(a => a.name === 'club')).toBe(true);
+    expect(result.data.specialActions?.some(a => a.name === 'Critical Damage')).toBe(true);
+    expect(result.data.description).toBeDefined();
+    expect(result.data.description).toContain('Giant, warty humanoids');
+  });
+
+  it('should parse Cairn stat block abilities as modifiers', () => {
+    const result = parseStatBlock(trollCairn, 'cairn');
+    expect(result.data.abilities?.find(a => a.name === 'STR')?.modifier).toBe(2);
+    expect(result.data.abilities?.find(a => a.name === 'DEX')?.modifier).toBe(1);
+    expect(result.data.abilities?.find(a => a.name === 'WIL')?.modifier).toBe(-3);
+  });
+
+  // ── AD&D 1e parser ─────────────────────────────────────────────
+  it('should parse AD&D 1e stat block (Orc)', () => {
+    const result = parseStatBlock(orcAdnd1e, 'adnd1e');
+    expect(result.success).toBe(true);
+    expect(result.data.name).toBe('Orc');
+    expect(result.data.ac).toBe(14); // 20 - 6 = 14
+    expect(result.data.hp).toBe(5); // 1 HD × 4.5 ≈ 5
+    expect(result.data.movement).toBe('90 ft'); // 9" × 10
+    expect(result.data.attacks?.length).toBe(1);
+    expect(result.data.attacks![0].damage).toBe('1-8');
+  });
+
+  it('should skip Nil special actions in AD&D 1e', () => {
+    const result = parseStatBlock(orcAdnd1e, 'adnd1e');
+    expect(result.data.specialActions?.length).toBe(0);
+  });
+
+  // ── BFRPG prose abilities ─────────────────────────────────────────
+  it('should extract abilities from BFRPG prose paragraphs (Troll)', () => {
+    const result = parseStatBlock(trollBfrpg, 'bfrpg');
+    expect(result.success).toBe(true);
+    expect(result.data.name).toBe('Troll');
+    const actionNames = result.data.specialActions?.map(a => a.name) ?? [];
+    expect(actionNames.some(n => /regenerat/i.test(n))).toBe(true);
+  });
+
+  it('should extract BFRPG Troll immunity from prose', () => {
+    const result = parseStatBlock(trollBfrpg, 'bfrpg');
+    const actionNames = result.data.specialActions?.map(a => a.name) ?? [];
+    expect(actionNames.some(n => /immun/i.test(n))).toBe(true);
+  });
+
+  // ── Description extraction ──────────────────────────────────────
+  it('should extract description from OSE Stirge stat block', () => {
+    const result = parseStatBlock(stirgeOse, 'ose');
+    expect(result.success).toBe(true);
+    expect(result.data.name).toBe('Stirge');
+    expect(result.data.description).toContain('Feathered');
+    expect(result.data.description).toContain('sharp beaks');
   });
 
   it('should not parse generic narrative text into saves', () => {

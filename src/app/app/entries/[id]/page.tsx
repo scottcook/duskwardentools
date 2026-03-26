@@ -6,6 +6,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Badge, Card, CardContent, ThreatBadge, useToast } from '@/components/ui';
 import { EntryActions } from './EntryActions';
 import { EditableCreatureCard } from '@/components/features/EditableCreatureCard';
+import { ExportActions } from '@/components/features/ExportActions';
 import { getEntry, getProject, updateEntry } from '@/lib/storage';
 import type { Entry, Project, OutputCreatureData, ThreatTier } from '@/types';
 
@@ -107,6 +108,11 @@ export default function EntryDetailPage() {
           </div>
 
           <div className="space-y-6">
+            <div className="print:hidden">
+              <h3 className="text-sm font-semibold text-text-primary mb-3">Export</h3>
+              <ExportActions outputData={outputData} location="entry_detail" />
+            </div>
+
             <details className="group border border-border rounded-lg overflow-hidden bg-bg-elevated">
               <summary className="flex items-center justify-between px-4 py-3 text-sm font-semibold text-text-primary cursor-pointer hover:bg-bg-base select-none list-none focus:outline-none focus-visible:ring-2 focus-visible:ring-accent">
                 <span>View Source Text</span>

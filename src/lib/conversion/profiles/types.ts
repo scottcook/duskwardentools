@@ -46,6 +46,10 @@ export interface ConversionProfile {
   showMorale: boolean;
   /** Whether to show the OSR-style reaction roll */
   showReaction: boolean;
+  /** Convert feet to abstract distance bands (close / near / far) */
+  useDistanceBands?: boolean;
+  /** Collapse Multiattack into an attack count (ATK N) instead of a special action */
+  collapseMultiattack?: boolean;
 
   /**
    * Base tier targets (role = 'skirmisher' / standard creature).

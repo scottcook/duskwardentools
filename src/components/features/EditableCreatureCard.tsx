@@ -193,6 +193,22 @@ export function EditableCreatureCard({ data, onSave, saving = false }: EditableC
           )}
         </div>
 
+        {(d.description || editing) && (
+          <div className="border-b border-border pb-3">
+            {editing ? (
+              <textarea
+                value={draft.description ?? ''}
+                onChange={(e) => updateDraft('description', e.target.value)}
+                rows={2}
+                className="w-full bg-bg-elevated border border-border rounded px-2 py-1.5 text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-accent resize-y min-h-10"
+                placeholder="Flavor text or physical description (optional)"
+              />
+            ) : (
+              <p className="text-sm italic text-text-muted">{d.description}</p>
+            )}
+          </div>
+        )}
+
         {/* Core stats */}
         <div className="grid grid-cols-3 gap-4 text-center border-b border-border pb-3">
           <div>

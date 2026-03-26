@@ -52,8 +52,8 @@ export default function ProjectDetailPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
-        <div>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
           <div className="flex items-center gap-2 text-sm text-text-muted mb-2">
             <Link href="/app/projects" className="hover:text-accent transition-colors">
               Projects
@@ -66,7 +66,9 @@ export default function ProjectDetailPage() {
             <p className="mt-1 text-text-muted">{project.description}</p>
           )}
         </div>
-        <ProjectActions project={project} />
+        <div className="w-full shrink-0 sm:w-auto flex justify-end">
+          <ProjectActions project={project} />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -96,18 +98,19 @@ export default function ProjectDetailPage() {
         </Card>
       </div>
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-lg font-semibold text-text-primary">Entries</h2>
-        <div className="flex items-center gap-4">
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-4 sm:justify-end">
           <button
+            type="button"
             onClick={() => setIsModalOpen(true)}
-            className="text-sm font-medium text-accent hover:text-accent-hover transition-colors"
+            className="min-h-[44px] w-full text-left text-sm font-medium text-accent hover:text-accent-hover transition-colors sm:min-h-0 sm:w-auto"
           >
             Add from Library
           </button>
           <Link
             href={`/app/convert?project=${project.id}`}
-            className="text-sm font-medium text-accent hover:text-accent-hover transition-colors"
+            className="inline-flex min-h-[44px] w-full items-center text-sm font-medium text-accent hover:text-accent-hover transition-colors sm:min-h-0 sm:w-auto"
           >
             Add new creature
           </Link>

@@ -100,6 +100,7 @@ function runPackPipeline(
   role?: CreatureRole,
   nameOverride?: string,
   referenceText?: string,
+  descriptionOverride?: string,
 ): { outputData: OutputCreatureData; validationReport: WizardState['validationReport'] } {
   const outputPackId = getOutputPackId(sourceSystem, settings.conversionProfileId);
   const pack = SYSTEM_PACKS[outputPackId];
@@ -107,6 +108,10 @@ function runPackPipeline(
 
   if (nameOverride?.trim()) {
     output.name = nameOverride.trim();
+  }
+
+  if (descriptionOverride?.trim()) {
+    output.description = descriptionOverride.trim();
   }
 
   output.outputPackId = outputPackId;
@@ -183,6 +188,7 @@ export function ConversionWizard({
     detectedSourceSystemConfidence: undefined,
     hasManualSourceSystemSelection: Boolean(existingEntry),
     creatureName: existingEntry?.output_json?.name ?? existingEntry?.title ?? '',
+    creatureDescription: existingEntry?.output_json?.description ?? '',
     metadata: {
       intendedLevel: (existingEntry?.parsed_json as ParsedCreatureData)?.level,
       role: undefined,
@@ -293,6 +299,7 @@ export function ConversionWizard({
           prev.metadata.role as CreatureRole,
           prev.creatureName || undefined,
           prev.referenceStatblock,
+          prev.creatureDescription || undefined,
         );
         return {
           ...prev,
@@ -321,6 +328,7 @@ export function ConversionWizard({
           prev.metadata.role as CreatureRole,
           prev.creatureName || undefined,
           prev.referenceStatblock,
+          prev.creatureDescription || undefined,
         );
         return {
           ...prev,
@@ -335,6 +343,9 @@ export function ConversionWizard({
     });
   }, []);
 
+  const handleDescriptionChange = useCallback((creatureDescription: string) =>
+    setState(prev => ({ ...prev, creatureDescription })), []);
+
   const handleCreatureNameChange = useCallback((creatureName: string) => {
     setState(prev => {
       if (prev.parsedData && prev.outputData) {
@@ -346,6 +357,7 @@ export function ConversionWizard({
           prev.metadata.role as CreatureRole,
           creatureName || undefined,
           prev.referenceStatblock,
+          prev.creatureDescription || undefined,
         );
         return {
           ...prev,
@@ -374,6 +386,7 @@ export function ConversionWizard({
           key === 'role' ? (value as CreatureRole) : prev.metadata.role as CreatureRole,
           prev.creatureName || undefined,
           prev.referenceStatblock,
+          prev.creatureDescription || undefined,
         );
         return {
           ...prev,
@@ -397,6 +410,7 @@ export function ConversionWizard({
           prev.metadata.role as CreatureRole,
           prev.creatureName || undefined,
           referenceStatblock,
+          prev.creatureDescription || undefined,
         );
         return {
           ...prev,
@@ -422,6 +436,7 @@ export function ConversionWizard({
       state.metadata.role as CreatureRole,
       state.creatureName || undefined,
       state.referenceStatblock,
+      state.creatureDescription || undefined,
     );
     setState(prev => ({
       ...prev,
@@ -442,7 +457,10 @@ export function ConversionWizard({
     });
     const effectiveName = state.creatureName || outputData.name || parsed.name || '';
     if (!title) setTitle(effectiveName);
-  }, [state.sourceText, state.sourceSystem, state.settings, state.metadata, state.creatureName, state.referenceStatblock, title]);
+    if (!state.creatureDescription && parsed.description) {
+      setState(prev => ({ ...prev, creatureDescription: parsed.description ?? '' }));
+    }
+  }, [state.sourceText, state.sourceSystem, state.settings, state.metadata, state.creatureName, state.creatureDescription, state.referenceStatblock, title]);
 
   // ── Settings change (sliders) ─────────────────────────────────────────────
   const handleSettingsChange = useCallback((settings: ConversionSettings) => {
@@ -460,6 +478,7 @@ export function ConversionWizard({
         prev.metadata.role as CreatureRole,
         prev.creatureName || undefined,
         prev.referenceStatblock,
+        prev.creatureDescription || undefined,
       );
       return {
         ...prev,
@@ -512,6 +531,7 @@ export function ConversionWizard({
       detectedSourceSystemConfidence: undefined,
       hasManualSourceSystemSelection: false,
       creatureName: '',
+      creatureDescription: '',
       metadata: {},
       parsedData: null,
       settings: applyProfileSettings('5e', getDefaultSettings(), getDefaultSettings().conversionProfileId),
@@ -553,12 +573,14 @@ export function ConversionWizard({
             hasManualSourceSystemSelection={state.hasManualSourceSystemSelection}
             conversionProfileId={state.settings.conversionProfileId}
             creatureName={state.creatureName}
+            creatureDescription={state.creatureDescription}
             metadata={state.metadata}
             isValid={state.isStatblockValid}
             onSourceChange={handleSourceChange}
             onSystemChange={handleSystemChange}
             onProfileChange={handleProfileChange}
             onCreatureNameChange={handleCreatureNameChange}
+            onDescriptionChange={handleDescriptionChange}
             onMetadataChange={handleMetadataChange}
             onNext={handleParseAndConvert}
           />
