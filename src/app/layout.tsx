@@ -4,6 +4,8 @@ import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import { FeedbackModal } from '@/components/features/FeedbackModal';
 import { NewsletterModal } from '@/components/features/NewsletterModal';
+import { ThemeProvider } from '@/components/providers/ThemeProvider';
+import { getThemeScript } from '@/lib/theme';
 import { siteConfig } from '@/lib/seo';
 import './globals.css';
 
@@ -60,13 +62,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" data-theme="dark" suppressHydrationWarning>
       <body className={`${montserrat.variable} ${unifrakturCook.variable} font-sans antialiased text-text-primary min-h-screen`}>
-        {children}
-        <NewsletterModal />
-        <FeedbackModal />
-        <Analytics />
-        <SpeedInsights />
+        <script dangerouslySetInnerHTML={{ __html: getThemeScript() }} />
+        <ThemeProvider>
+          {children}
+          <NewsletterModal />
+          <FeedbackModal />
+          <Analytics />
+          <SpeedInsights />
+        </ThemeProvider>
       </body>
     </html>
   );

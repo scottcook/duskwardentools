@@ -123,7 +123,7 @@ export function EditableCreatureCard({ data, onSave, saving = false }: EditableC
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             {isEdited && !editing && (
-              <span className="text-[10px] font-semibold uppercase tracking-widest text-accent/70 border border-accent/30 bg-accent/5 rounded px-1.5 py-0.5">
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-(--badge-accent-text) border border-(--badge-accent-border) bg-(--badge-accent-bg) rounded px-1.5 py-0.5">
                 Edited
               </span>
             )}

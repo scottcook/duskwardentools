@@ -48,7 +48,7 @@ export default function ShadowdarkCompatiblePage() {
         <JsonLd data={schema} />
         <div className="max-w-4xl mx-auto space-y-10">
         <div className="space-y-4">
-          <p className="text-sm uppercase tracking-[0.2em] text-accent/80">For use with Shadowdark RPG</p>
+          <p className="text-sm uppercase tracking-[0.2em] text-accent">For use with Shadowdark RPG</p>
           <h1 className="text-4xl sm:text-5xl font-bold text-text-primary text-balance">
             Create Shadowdark-compatible monster stat cards from your existing source material
           </h1>

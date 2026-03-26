@@ -70,7 +70,7 @@ export default function FaqPage() {
         <JsonLd data={faqSchema} />
         <div className="max-w-4xl mx-auto space-y-10">
         <div className="space-y-4">
-          <p className="text-sm uppercase tracking-[0.2em] text-accent/80">FAQ</p>
+          <p className="text-sm uppercase tracking-[0.2em] text-accent">FAQ</p>
           <h1 className="text-4xl sm:text-5xl font-bold text-text-primary text-balance">
             Duskwarden FAQ: converting monsters for OSR and Shadowdark-compatible play
           </h1>
@@ -92,7 +92,7 @@ export default function FaqPage() {
         </section>
 
         <section className="rounded-[1.75rem] border border-border bg-bg-surface p-6 sm:p-8">
-          <p className="text-sm uppercase tracking-[0.22em] text-accent/80">Fastest path</p>
+          <p className="text-sm uppercase tracking-[0.22em] text-accent">Fastest path</p>
           <h2 className="mt-3 text-2xl font-bold text-text-primary">Ready to convert a stat block?</h2>
           <p className="mt-3 max-w-2xl text-sm text-text-muted">
             If you already know what you want to convert, go straight into the converter. If you want a more specific explanation first, use one of the workflow pages below.

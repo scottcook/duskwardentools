@@ -8,15 +8,15 @@ interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
 }
 
 const variantStyles: Record<BadgeVariant, string> = {
-  default: 'bg-bg-elevated text-text-muted border-border',
-  accent: 'bg-accent/20 text-accent border-accent/30',
-  success: 'bg-success/20 text-success border-success/30',
-  error: 'bg-error/20 text-error border-error/30',
-  tier1: 'bg-green-900/30 text-green-400 border-green-700/50',
-  tier2: 'bg-blue-900/30 text-blue-400 border-blue-700/50',
-  tier3: 'bg-yellow-900/30 text-yellow-400 border-yellow-700/50',
-  tier4: 'bg-orange-900/30 text-orange-400 border-orange-700/50',
-  tier5: 'bg-red-900/30 text-red-400 border-red-700/50',
+  default: 'bg-(--badge-default-bg) text-(--badge-default-text) border-(--badge-default-border)',
+  accent: 'bg-(--badge-accent-bg) text-(--badge-accent-text) border-(--badge-accent-border)',
+  success: 'bg-(--badge-success-bg) text-(--badge-success-text) border-(--badge-success-border)',
+  error: 'bg-(--badge-error-bg) text-(--badge-error-text) border-(--badge-error-border)',
+  tier1: 'bg-(--badge-tier1-bg) text-(--badge-tier1-text) border-(--badge-tier1-border)',
+  tier2: 'bg-(--badge-tier2-bg) text-(--badge-tier2-text) border-(--badge-tier2-border)',
+  tier3: 'bg-(--badge-tier3-bg) text-(--badge-tier3-text) border-(--badge-tier3-border)',
+  tier4: 'bg-(--badge-tier4-bg) text-(--badge-tier4-text) border-(--badge-tier4-border)',
+  tier5: 'bg-(--badge-tier5-bg) text-(--badge-tier5-text) border-(--badge-tier5-border)',
 };
 
 export function Badge({ variant = 'default', children, className = '', ...props }: BadgeProps) {

@@ -137,7 +137,7 @@ export function MonstroBrowserModal({ isOpen, onClose, onSelect }: MonstroBrowse
     loadMonsters();
   }, [isOpen]);
 
-  const filteredMonsters = useMemo(() => {
+  const { filteredMonsters, totalMatches } = useMemo(() => {
     let result = monsters;
 
     if (search.trim()) {
@@ -155,7 +155,8 @@ export function MonstroBrowserModal({ isOpen, onClose, onSelect }: MonstroBrowse
       );
     }
 
-    return result.slice(0, 50);
+    const total = result.length;
+    return { filteredMonsters: result.slice(0, 50), totalMatches: total };
   }, [monsters, search, sourcebookFilter]);
 
   const handleSelect = useCallback(async (monster: MonstroIndexItem) => {
@@ -222,13 +223,13 @@ export function MonstroBrowserModal({ isOpen, onClose, onSelect }: MonstroBrowse
             placeholder="Search monsters..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="flex-1"
+            className="w-full sm:flex-1"
           />
           <Select
             options={SOURCEBOOK_OPTIONS}
             value={sourcebookFilter}
             onChange={(e) => setSourcebookFilter(e.target.value)}
-            className="sm:w-56"
+            className="w-full sm:flex-1"
           />
         </div>
 
@@ -243,47 +244,54 @@ export function MonstroBrowserModal({ isOpen, onClose, onSelect }: MonstroBrowse
             <div className="animate-spin h-6 w-6 border-2 border-accent border-t-transparent rounded-full" />
           </div>
         ) : (
-          <div className="grid max-h-[420px] auto-rows-min grid-cols-1 gap-1.5 overflow-auto pr-1 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredMonsters.length === 0 ? (
-              <div className="col-span-full text-center py-6 text-text-muted">
-                No monsters found. Try a different search term.
-              </div>
-            ) : (
-              filteredMonsters.map((monster) => (
-                <Card key={monster.slug} padding="none" className="overflow-hidden">
-                  <button
-                    type="button"
-                    onClick={() => handleSelect(monster)}
-                    className="w-full px-3 py-2.5 text-left transition-colors hover:bg-bg-elevated focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                  >
-                    <div className="flex items-start justify-between gap-1">
-                      <div className="text-sm font-semibold leading-snug text-text-primary">
-                        {monster.title}
-                      </div>
-                      {selectingSlug === monster.slug && (
-                        <div className="mt-1 h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-accent border-t-transparent" />
-                      )}
-                    </div>
-                    <div className="mt-2 flex flex-wrap items-center gap-1 text-xs text-text-muted">
-                      {monster.type && <Badge variant="default" className="px-1.5 py-0 text-[11px]">{monster.type}</Badge>}
-                      {monster.biome && <span className="text-text-muted/80">{monster.biome}</span>}
-                    </div>
-                    <div className="mt-1 text-[10px] uppercase tracking-[0.14em] text-text-muted/60">
-                      {formatSourcebookLabel(monster.sourcebooks?.[0]) ?? 'Unknown source'}
-                    </div>
-                    {monster.description && (
-                      <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-text-muted/80">
-                        {monster.description}
-                      </p>
-                    )}
-                  </button>
-                </Card>
-              ))
+          <>
+            {totalMatches > 50 && (
+              <p className="text-xs text-text-muted">
+                Showing 50 of {totalMatches.toLocaleString()} - search to narrow results.
+              </p>
             )}
-          </div>
+            <div className="grid max-h-[420px] auto-rows-min grid-cols-1 gap-1.5 overflow-auto pr-1 sm:grid-cols-2 lg:grid-cols-3">
+              {filteredMonsters.length === 0 ? (
+                <div className="col-span-full text-center py-6 text-text-muted">
+                  No monsters found. Try a different search term.
+                </div>
+              ) : (
+                filteredMonsters.map((monster) => (
+                  <Card key={monster.slug} padding="none" className="overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => handleSelect(monster)}
+                      className="w-full px-3 py-3 text-left transition-colors hover:bg-bg-elevated focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                    >
+                      <div className="flex items-start justify-between gap-1">
+                        <div className="text-sm font-semibold leading-snug text-text-primary">
+                          {monster.title}
+                        </div>
+                        {selectingSlug === monster.slug && (
+                          <div className="mt-1 h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+                        )}
+                      </div>
+                      <div className="mt-2.5 flex flex-wrap items-center gap-1 text-xs text-text-muted">
+                        {monster.type && <Badge variant="default" className="px-1.5 py-0 text-[11px]">{monster.type}</Badge>}
+                        {monster.biome && <span className="text-text-muted/80">{monster.biome}</span>}
+                      </div>
+                      <div className="mt-1.5 text-[10px] uppercase tracking-[0.14em] leading-relaxed text-text-muted">
+                        {formatSourcebookLabel(monster.sourcebooks?.[0]) ?? 'Unknown source'}
+                      </div>
+                      {monster.description && (
+                        <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-text-muted/80">
+                          {monster.description}
+                        </p>
+                      )}
+                    </button>
+                  </Card>
+                ))
+              )}
+            </div>
+          </>
         )}
 
-        <div className="border-t border-border pt-1.5 text-[10px] text-text-muted">
+        <div className="border-t border-border pt-1.5 text-xs text-text-muted">
           Data from{' '}
           <a
             href="https://monstro.cc"

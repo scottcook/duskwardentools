@@ -49,7 +49,7 @@ export default function FiveEToOsrPage() {
         <JsonLd data={faqSchema} />
         <div className="max-w-4xl mx-auto space-y-10">
         <div className="space-y-4">
-          <p className="text-sm uppercase tracking-[0.2em] text-accent/80">5e to OSR workflow</p>
+          <p className="text-sm uppercase tracking-[0.2em] text-accent">5e to OSR workflow</p>
           <h1 className="text-4xl sm:text-5xl font-bold text-text-primary text-balance">
             5e to OSR monster converter for faster, table-ready stat cards
           </h1>

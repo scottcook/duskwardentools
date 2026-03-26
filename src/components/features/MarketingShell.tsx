@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
 import { FeedbackLink } from './FeedbackLink';
 import { NewsletterSignupLink } from './NewsletterSignupLink';
+import { ThemeToggle } from './ThemeToggle';
 import { TrackedLink } from './TrackedLink';
 
 const marketingNavItems = [
@@ -37,7 +38,7 @@ export function MarketingShell({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen flex flex-col bg-bg-base">
       <header className="sticky top-0 z-40 border-b border-border bg-bg-base/95 backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto px-4">
           <div className="flex items-center justify-between gap-4 py-4">
             <Link
               href="/"
@@ -47,6 +48,7 @@ export function MarketingShell({ children }: { children: ReactNode }) {
               Duskwarden
             </Link>
             <div className="flex items-center gap-2">
+              <ThemeToggle />
               <nav className="hidden md:flex items-center gap-3 lg:gap-5 text-sm text-text-muted" aria-label="Marketing navigation">
                 {marketingNavItems.map((item) => (
                   <TrackedLink
@@ -54,7 +56,7 @@ export function MarketingShell({ children }: { children: ReactNode }) {
                     href={item.href}
                     className={`rounded-lg px-2.5 py-2 transition-colors focus:outline-none focus:ring-2 focus:ring-accent ${
                       isActive(item.href)
-                        ? 'text-text-primary'
+                        ? 'border border-(--pill-active-border) bg-(--pill-active-bg) text-(--pill-active-text)'
                         : 'hover:text-text-primary'
                     }`}
                     eventName={item.eventName}
@@ -66,7 +68,7 @@ export function MarketingShell({ children }: { children: ReactNode }) {
                 ))}
                 <TrackedLink
                   href="/app/convert"
-                  className="px-4 py-2 bg-accent text-bg-base font-medium rounded-lg hover:bg-accent-hover transition-colors focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-bg-base"
+                  className="whitespace-nowrap px-4 py-2 bg-accent text-bg-base font-medium rounded-lg hover:bg-accent-hover transition-colors focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-bg-base"
                   eventName="marketing_cta_click"
                   eventProperties={{ location: 'marketing_header', destination: 'convert' }}
                 >
@@ -100,7 +102,7 @@ export function MarketingShell({ children }: { children: ReactNode }) {
             className="md:hidden border-t border-border bg-bg-surface"
             aria-label="Marketing mobile navigation"
           >
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 space-y-1">
+            <div className="max-w-7xl mx-auto px-4 py-3 space-y-1">
               {marketingNavItems.map((item) => (
                 <TrackedLink
                   key={item.href}
@@ -108,7 +110,7 @@ export function MarketingShell({ children }: { children: ReactNode }) {
                   onClick={() => setMobileMenuOpen(false)}
                   className={`block rounded-lg px-4 py-3 text-base font-medium transition-colors min-h-[48px] ${
                     isActive(item.href)
-                      ? 'bg-accent/10 text-accent'
+                      ? 'border border-(--pill-active-border) bg-(--pill-active-bg) text-(--pill-active-text)'
                       : 'text-text-muted hover:text-text-primary hover:bg-bg-elevated'
                   }`}
                   eventName={item.eventName}
@@ -121,7 +123,7 @@ export function MarketingShell({ children }: { children: ReactNode }) {
               <TrackedLink
                 href="/app/convert"
                 onClick={() => setMobileMenuOpen(false)}
-                className="mt-2 inline-flex min-h-[48px] w-full items-center justify-center rounded-lg bg-accent px-4 py-3 text-base font-semibold text-bg-base transition-colors hover:bg-accent-hover focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-bg-surface"
+                className="mt-2 inline-flex min-h-[48px] w-full items-center justify-center whitespace-nowrap rounded-lg bg-accent px-4 py-3 text-base font-semibold text-bg-base transition-colors hover:bg-accent-hover focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-bg-surface"
                 eventName="marketing_cta_click"
                 eventProperties={{ location: 'marketing_header_mobile', destination: 'convert' }}
               >
@@ -135,7 +137,7 @@ export function MarketingShell({ children }: { children: ReactNode }) {
       <div className="flex-1">{children}</div>
 
       <footer className="border-t border-border">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+        <div className="max-w-7xl mx-auto px-4 py-4">
           <p className="text-center text-xs text-text-muted">
             Duskwarden Tools is an independent product and is not affiliated with The Arcane Library, LLC.
           </p>

@@ -89,7 +89,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto space-y-12 sm:space-y-16">
           <section className="grid gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)] lg:items-center">
             <div className="max-w-3xl">
-              <p className="text-sm uppercase tracking-[0.24em] text-accent/80">
+              <p className="text-sm uppercase tracking-[0.24em] text-accent">
                 Monster stat block converter for tabletop RPG GMs
               </p>
               <h1 className="mt-5 text-4xl sm:text-5xl lg:text-6xl font-bold text-text-primary text-balance leading-tight">
@@ -101,7 +101,7 @@ export default function LandingPage() {
               <div className="mt-8 flex flex-col sm:flex-row items-start gap-4">
                 <TrackedLink
                   href="/app/convert"
-                  className="inline-flex w-full sm:w-auto items-center justify-center px-6 py-3 bg-accent text-bg-base font-semibold rounded-xl hover:bg-accent-hover transition-colors focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-bg-base"
+                  className="inline-flex w-full sm:w-auto items-center justify-center whitespace-nowrap px-6 py-3 bg-accent text-bg-base font-semibold rounded-xl hover:bg-accent-hover transition-colors focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-bg-base"
                   eventName="marketing_cta_click"
                   eventProperties={{ location: 'home_hero', destination: 'convert', style: 'primary' }}
                 >
@@ -131,7 +131,7 @@ export default function LandingPage() {
                 <div className="border-b border-border px-5 py-4">
                   <div className="flex items-center justify-between gap-4">
                     <div>
-                      <p className="text-xs uppercase tracking-[0.22em] text-accent/70">Product Preview</p>
+                      <p className="text-xs uppercase tracking-[0.22em] text-accent">Product Preview</p>
                       <p className="mt-1 text-sm font-medium text-text-primary">A calmer way to prep monster cards</p>
                     </div>
                     <span className="rounded-full border border-border bg-bg-base px-3 py-1 text-xs text-text-muted">
@@ -223,7 +223,7 @@ export default function LandingPage() {
 
           <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
             <div>
-              <p className="text-sm uppercase tracking-[0.22em] text-accent/80">Choose your workflow</p>
+              <p className="text-sm uppercase tracking-[0.22em] text-accent">Choose your workflow</p>
               <h2 className="mt-3 text-3xl font-bold text-text-primary">Use the page that matches what you are trying to do</h2>
               <p className="mt-3 max-w-2xl text-text-muted">
                 The homepage is here to get you into the tool quickly. The dedicated workflow pages go deeper on use cases, compatibility language, and search-oriented explanations.
@@ -233,27 +233,27 @@ export default function LandingPage() {
                   <TrackedLink
                     key={card.href}
                     href={card.href}
-                    className="group rounded-2xl border border-border bg-bg-surface p-6 transition-colors hover:border-accent/40"
+                    className="group flex h-full flex-col rounded-2xl border border-border bg-bg-surface p-6 transition-colors hover:border-accent/40"
                     eventName="marketing_cta_click"
                     eventProperties={{ location: 'home_workflows', destination: card.eventDestination, style: 'card' }}
                   >
                     <p className="text-lg font-semibold text-text-primary">{card.title}</p>
                     <p className="mt-3 text-sm text-text-muted">{card.description}</p>
-                    <p className="mt-5 text-sm font-medium text-accent">Explore this workflow</p>
+                    <p className="mt-auto pt-5 text-sm font-medium text-accent">Explore this workflow</p>
                   </TrackedLink>
                 ))}
               </div>
             </div>
 
             <div className="rounded-[1.75rem] border border-border bg-bg-surface p-6">
-              <p className="text-sm uppercase tracking-[0.22em] text-accent/80">Start Here</p>
+              <p className="text-sm uppercase tracking-[0.22em] text-accent">Start Here</p>
               <h2 className="mt-3 text-2xl font-bold text-text-primary">Open the converter when you already know the job to be done</h2>
               <p className="mt-3 text-sm text-text-muted">
                 Best for returning users, quick prep sessions, or anyone arriving with a stat block already in hand.
               </p>
               <TrackedLink
                 href="/app/convert"
-                className="mt-6 inline-flex items-center justify-center w-full px-5 py-3 bg-accent text-bg-base font-semibold rounded-xl hover:bg-accent-hover transition-colors focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-bg-surface"
+                className="mt-6 inline-flex items-center justify-center whitespace-nowrap w-full px-5 py-3 bg-accent text-bg-base font-semibold rounded-xl hover:bg-accent-hover transition-colors focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-bg-surface"
                 eventName="marketing_cta_click"
                 eventProperties={{ location: 'home_sidebar', destination: 'convert', style: 'primary' }}
               >
@@ -261,7 +261,7 @@ export default function LandingPage() {
               </TrackedLink>
               <TrackedLink
                 href="/faq"
-                className="mt-3 inline-flex items-center justify-center w-full px-5 py-3 border border-border text-text-primary font-medium rounded-xl hover:bg-bg-base transition-colors focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-bg-surface"
+                className="mt-3 inline-flex items-center justify-center whitespace-nowrap w-full px-5 py-3 border border-border text-text-primary font-medium rounded-xl hover:bg-bg-base transition-colors focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-bg-surface"
                 eventName="marketing_cta_click"
                 eventProperties={{ location: 'home_sidebar', destination: 'faq', style: 'secondary' }}
               >

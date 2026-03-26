@@ -14,6 +14,85 @@
   --border: #333333;
   --error: #ef4444;
   --success: #22c55e;
+  --body-overlay: rgb(10 10 10 / 0.89);
+  --selection-text: #0a0a0a;
+  --badge-default-bg: #262626;
+  --badge-default-text: #d4d4d4;
+  --badge-default-border: #4a4a4a;
+  --badge-accent-bg: #3c2c1e;
+  --badge-accent-text: #f0d1ac;
+  --badge-accent-border: #73563a;
+  --badge-success-bg: #173826;
+  --badge-success-text: #9de3bb;
+  --badge-success-border: #2c7a52;
+  --badge-error-bg: #3b1d1d;
+  --badge-error-text: #f7b4b4;
+  --badge-error-border: #a64b4b;
+  --badge-tier1-bg: #193524;
+  --badge-tier1-text: #8fe0ae;
+  --badge-tier1-border: #2f7a4f;
+  --badge-tier2-bg: #172d45;
+  --badge-tier2-text: #93c5fd;
+  --badge-tier2-border: #335f8f;
+  --badge-tier3-bg: #443516;
+  --badge-tier3-text: #f8d67a;
+  --badge-tier3-border: #8d6c1f;
+  --badge-tier4-bg: #4a2610;
+  --badge-tier4-text: #fdba74;
+  --badge-tier4-border: #a34f1d;
+  --badge-tier5-bg: #4a1818;
+  --badge-tier5-text: #fda4a4;
+  --badge-tier5-border: #a93b3b;
+  --pill-active-bg: #302316;
+  --pill-active-text: #f0d1ac;
+  --pill-active-border: #6f5439;
+  color-scheme: dark;
+}
+
+[data-theme='light'] {
+  --bg-base: #f3ede1;
+  --bg-surface: #fbf7ef;
+  --bg-elevated: #efe5d5;
+  --text-primary: #241c15;
+  --text-muted: #5d5449;
+  --accent: #5f3918;
+  --accent-hover: #4f2f14;
+  --border: #d7ccbc;
+  --error: #dc2626;
+  --success: #15803d;
+  --body-overlay: rgb(248 243 234 / 0.92);
+  --selection-text: #fbf7ef;
+  --badge-default-bg: #efe5d5;
+  --badge-default-text: #3f362d;
+  --badge-default-border: #bcae99;
+  --badge-accent-bg: #ead8c4;
+  --badge-accent-text: #5f3918;
+  --badge-accent-border: #b68b63;
+  --badge-success-bg: #deefe4;
+  --badge-success-text: #14532d;
+  --badge-success-border: #86b79b;
+  --badge-error-bg: #f7dede;
+  --badge-error-text: #991b1b;
+  --badge-error-border: #d49b9b;
+  --badge-tier1-bg: #e1efe6;
+  --badge-tier1-text: #1f5e37;
+  --badge-tier1-border: #96c2a2;
+  --badge-tier2-bg: #e0eaf6;
+  --badge-tier2-text: #17406c;
+  --badge-tier2-border: #96b3d4;
+  --badge-tier3-bg: #f7eed2;
+  --badge-tier3-text: #6a4d00;
+  --badge-tier3-border: #d5b770;
+  --badge-tier4-bg: #f6e3d7;
+  --badge-tier4-text: #8a4514;
+  --badge-tier4-border: #d9a17c;
+  --badge-tier5-bg: #f6dddd;
+  --badge-tier5-text: #8f1d1d;
+  --badge-tier5-border: #d39b9b;
+  --pill-active-bg: #ead8c4;
+  --pill-active-text: #5f3918;
+  --pill-active-border: #b68b63;
+  color-scheme: light;
 }
 
 @theme inline {
@@ -51,12 +130,13 @@ html {
 
 body {
   /* Transparent so the html background shows through */
-  background-color: rgb(10 10 10 / 0.89);
+  background-color: var(--body-overlay);
   color: var(--text-primary);
   font-family: var(--font-montserrat), sans-serif;
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 200ms ease, color 200ms ease;
 }
 
 :focus-visible {
@@ -66,7 +146,7 @@ body {
 
 ::selection {
   background: var(--accent);
-  color: var(--bg-base);
+  color: var(--selection-text);
 }
 
 @media print {

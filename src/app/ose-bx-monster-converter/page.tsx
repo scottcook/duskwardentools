@@ -49,7 +49,7 @@ export default function OseBxMonsterConverterPage() {
         <JsonLd data={faqSchema} />
         <div className="max-w-4xl mx-auto space-y-10">
         <div className="space-y-4">
-          <p className="text-sm uppercase tracking-[0.2em] text-accent/80">OSE and B/X conversion</p>
+          <p className="text-sm uppercase tracking-[0.2em] text-accent">OSE and B/X conversion</p>
           <h1 className="text-4xl sm:text-5xl font-bold text-text-primary text-balance">
             Convert OSE and B/X monster stat blocks into printable old-school monster cards
           </h1>

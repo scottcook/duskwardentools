@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
 import { FeedbackLink } from './FeedbackLink';
 import { NewsletterSignupLink } from './NewsletterSignupLink';
+import { ThemeToggle } from './ThemeToggle';
 
 interface NavItem {
   href: string;
@@ -84,7 +85,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                       flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors
                       focus:outline-none focus:ring-2 focus:ring-accent
                       ${isActive(item.href)
-                        ? 'bg-accent/10 text-accent'
+                        ? 'border border-(--pill-active-border) bg-(--pill-active-bg) text-(--pill-active-text)'
                         : 'text-text-muted hover:text-text-primary hover:bg-bg-elevated'
                       }
                     `}
@@ -98,6 +99,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </div>
 
             <div className="flex items-center gap-2">
+              <ThemeToggle />
               <Link
                 href="/app/settings"
                 className="p-2.5 text-text-muted hover:text-text-primary rounded-lg hover:bg-bg-elevated transition-colors focus:outline-none focus:ring-2 focus:ring-accent min-w-[44px] min-h-[44px] flex items-center justify-center"
@@ -139,7 +141,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   className={`
                     flex items-center gap-3 px-4 py-3 rounded-lg text-base font-medium transition-colors min-h-[48px]
                     ${isActive(item.href)
-                      ? 'bg-accent/10 text-accent'
+                      ? 'border border-(--pill-active-border) bg-(--pill-active-bg) text-(--pill-active-text)'
                       : 'text-text-muted hover:text-text-primary hover:bg-bg-elevated'
                     }
                   `}
