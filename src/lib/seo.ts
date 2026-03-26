@@ -5,6 +5,7 @@ export const siteConfig = {
   shortName: 'Duskwarden',
   url: process.env.NEXT_PUBLIC_SITE_URL || 'https://duskwarden.vercel.app',
   email: 'duskwardentools@gmail.com',
+  donateUrl: 'https://buymeacoffee.com/duskwarden',
   defaultTitle: 'Duskwarden | Monster Stat Block Converter for OSR and Shadowdark-Compatible Play',
   defaultDescription:
     'Convert 5e, OSE, B/X, and generic monster stat blocks into streamlined OSR and Shadowdark-compatible stat cards with export and print support.',

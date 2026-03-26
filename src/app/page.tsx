@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { JsonLd } from '@/components/features/JsonLd';
 import { MarketingShell } from '@/components/features/MarketingShell';
+import { SupportLink } from '@/components/features/SupportLink';
 import { TrackedLink } from '@/components/features/TrackedLink';
 import { buildMetadata, siteConfig } from '@/lib/seo';
 
@@ -268,6 +269,13 @@ export default function LandingPage() {
                 Read common questions first
               </TrackedLink>
             </div>
+          </section>
+
+          <section className="flex flex-col items-center gap-3 text-center">
+            <p className="text-sm text-text-muted">
+              Duskwarden is free to use. If it saves you prep time, consider supporting the project.
+            </p>
+            <SupportLink location="home_support_section" variant="button" />
           </section>
         </div>
       </main>

@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
 import { FeedbackLink } from './FeedbackLink';
 import { NewsletterSignupLink } from './NewsletterSignupLink';
+import { SupportLink } from './SupportLink';
 import { ThemeToggle } from './ThemeToggle';
 import { TrackedLink } from './TrackedLink';
 
@@ -49,7 +50,7 @@ export function MarketingShell({ children }: { children: ReactNode }) {
             </Link>
             <div className="flex items-center gap-2">
               <ThemeToggle />
-              <nav className="hidden md:flex items-center gap-3 lg:gap-5 text-sm text-text-muted" aria-label="Marketing navigation">
+              <nav className="hidden lg:flex items-center gap-3 xl:gap-5 text-sm text-text-muted" aria-label="Marketing navigation">
                 {marketingNavItems.map((item) => (
                   <TrackedLink
                     key={item.href}
@@ -66,6 +67,15 @@ export function MarketingShell({ children }: { children: ReactNode }) {
                     {item.label}
                   </TrackedLink>
                 ))}
+                <SupportLink
+                  location="marketing_header"
+                  variant="inline"
+                  className="rounded-lg px-2.5 py-2 transition-colors hover:text-text-primary inline-flex items-center gap-1.5"
+                />
+                <FeedbackLink
+                  location="marketing_header"
+                  className="rounded-lg px-2.5 py-2 transition-colors hover:text-text-primary"
+                />
                 <TrackedLink
                   href="/app/convert"
                   className="whitespace-nowrap px-4 py-2 bg-accent text-bg-base font-medium rounded-lg hover:bg-accent-hover transition-colors focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-bg-base"
@@ -79,7 +89,7 @@ export function MarketingShell({ children }: { children: ReactNode }) {
               <button
                 type="button"
                 onClick={() => setMobileMenuOpen((open) => !open)}
-                className="md:hidden p-2.5 text-text-muted hover:text-text-primary rounded-lg hover:bg-bg-elevated transition-colors focus:outline-none focus:ring-2 focus:ring-accent min-w-[44px] min-h-[44px] flex items-center justify-center"
+                className="lg:hidden p-2.5 text-text-muted hover:text-text-primary rounded-lg hover:bg-bg-elevated transition-colors focus:outline-none focus:ring-2 focus:ring-accent min-w-[44px] min-h-[44px] flex items-center justify-center"
                 aria-label="Toggle marketing menu"
                 aria-expanded={mobileMenuOpen}
                 aria-controls="marketing-mobile-menu"
@@ -99,7 +109,7 @@ export function MarketingShell({ children }: { children: ReactNode }) {
         {mobileMenuOpen && (
           <nav
             id="marketing-mobile-menu"
-            className="md:hidden border-t border-border bg-bg-surface"
+            className="lg:hidden border-t border-border bg-bg-surface"
             aria-label="Marketing mobile navigation"
           >
             <div className="max-w-7xl mx-auto px-4 py-3 space-y-1">
@@ -120,6 +130,18 @@ export function MarketingShell({ children }: { children: ReactNode }) {
                   {item.label}
                 </TrackedLink>
               ))}
+              <div className="border-t border-border mt-2 pt-2 flex items-center gap-3 px-4 py-2">
+                <SupportLink
+                  location="marketing_header_mobile"
+                  variant="inline"
+                  className="inline-flex items-center gap-1.5 text-sm text-text-muted hover:text-text-primary transition-colors"
+                />
+                <span className="text-border">·</span>
+                <FeedbackLink
+                  location="marketing_header_mobile"
+                  className="text-sm text-text-muted hover:text-text-primary transition-colors"
+                />
+              </div>
               <TrackedLink
                 href="/app/convert"
                 onClick={() => setMobileMenuOpen(false)}
@@ -145,6 +167,8 @@ export function MarketingShell({ children }: { children: ReactNode }) {
             Conversion output uses compatibility heuristics and should be reviewed before publication or play.
           </p>
           <p className="mt-2 text-center text-xs text-text-muted flex items-center justify-center gap-3 flex-wrap">
+            <SupportLink location="marketing_footer" />
+            <span className="text-border">·</span>
             <NewsletterSignupLink location="marketing_footer" />
             <span className="text-border">·</span>
             <FeedbackLink location="marketing_footer" />

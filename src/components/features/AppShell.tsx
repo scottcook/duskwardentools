@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
 import { FeedbackLink } from './FeedbackLink';
 import { NewsletterSignupLink } from './NewsletterSignupLink';
+import { SupportLink } from './SupportLink';
 import { ThemeToggle } from './ThemeToggle';
 
 interface NavItem {
@@ -76,7 +77,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               >
                 Duskwarden
               </Link>
-              <nav className="hidden md:flex items-center gap-1" aria-label="Main navigation">
+              <nav className="hidden lg:flex items-center gap-1" aria-label="Main navigation">
                 {navItems.map((item) => (
                   <Link
                     key={item.href}
@@ -99,6 +100,17 @@ export function AppShell({ children }: { children: ReactNode }) {
             </div>
 
             <div className="flex items-center gap-2">
+              <div className="hidden lg:flex items-center gap-1 text-sm">
+                <SupportLink
+                  location="app_header"
+                  variant="inline"
+                  className="rounded-lg px-2.5 py-2 text-text-muted hover:text-text-primary transition-colors inline-flex items-center gap-1.5"
+                />
+                <FeedbackLink
+                  location="app_header"
+                  className="rounded-lg px-2.5 py-2 text-text-muted hover:text-text-primary transition-colors"
+                />
+              </div>
               <ThemeToggle />
               <Link
                 href="/app/settings"
@@ -114,7 +126,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <button
                 type="button"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="md:hidden p-2.5 text-text-muted hover:text-text-primary rounded-lg hover:bg-bg-elevated transition-colors focus:outline-none focus:ring-2 focus:ring-accent min-w-[44px] min-h-[44px] flex items-center justify-center"
+                className="lg:hidden p-2.5 text-text-muted hover:text-text-primary rounded-lg hover:bg-bg-elevated transition-colors focus:outline-none focus:ring-2 focus:ring-accent min-w-[44px] min-h-[44px] flex items-center justify-center"
                 aria-label="Toggle menu"
                 aria-expanded={mobileMenuOpen}
               >
@@ -131,7 +143,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
 
         {mobileMenuOpen && (
-          <nav className="md:hidden border-t border-border bg-bg-surface" aria-label="Mobile navigation">
+          <nav className="lg:hidden border-t border-border bg-bg-surface" aria-label="Mobile navigation">
             <div className="px-3 py-2.5 space-y-1">
               {navItems.map((item) => (
                 <Link
@@ -151,6 +163,18 @@ export function AppShell({ children }: { children: ReactNode }) {
                   {item.label}
                 </Link>
               ))}
+              <div className="border-t border-border mt-2 pt-2 flex items-center gap-3 px-4 py-2">
+                <SupportLink
+                  location="app_header_mobile"
+                  variant="inline"
+                  className="inline-flex items-center gap-1.5 text-sm text-text-muted hover:text-text-primary transition-colors"
+                />
+                <span className="text-border">·</span>
+                <FeedbackLink
+                  location="app_header_mobile"
+                  className="text-sm text-text-muted hover:text-text-primary transition-colors"
+                />
+              </div>
             </div>
           </nav>
         )}
@@ -168,6 +192,8 @@ export function AppShell({ children }: { children: ReactNode }) {
             Duskwarden Tools is an independent product and is not affiliated with The Arcane Library, LLC.
           </p>
           <p className="mt-2 text-center text-xs text-text-muted flex items-center justify-center gap-3 flex-wrap">
+            <SupportLink location="app_footer" />
+            <span className="text-border">·</span>
             <NewsletterSignupLink location="app_footer" />
             <span className="text-border">·</span>
             <FeedbackLink location="app_footer" />
