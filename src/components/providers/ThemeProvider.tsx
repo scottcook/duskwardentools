@@ -49,11 +49,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(getInitialTheme);
 
   const setTheme = useCallback((nextTheme: Theme) => {
+    const root = document.documentElement;
+    root.classList.add('theme-transition');
     setThemeState(nextTheme);
     applyTheme(nextTheme);
     try {
       localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
     } catch (error) {}
+    window.setTimeout(() => root.classList.remove('theme-transition'), 300);
   }, []);
 
   const toggleTheme = useCallback(() => {
