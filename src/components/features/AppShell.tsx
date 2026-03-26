@@ -65,7 +65,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen flex flex-col">
       <header className="sticky top-0 z-40 bg-bg-base/80 backdrop-blur-sm border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto px-3 sm:px-5 lg:px-6">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-6">
               <Link
@@ -130,7 +130,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         {mobileMenuOpen && (
           <nav className="md:hidden border-t border-border bg-bg-surface" aria-label="Mobile navigation">
-            <div className="px-4 py-3 space-y-1">
+            <div className="px-3 py-2.5 space-y-1">
               {navItems.map((item) => (
                 <Link
                   key={item.href}
@@ -155,13 +155,13 @@ export function AppShell({ children }: { children: ReactNode }) {
       </header>
 
       <main className="flex-1">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="mx-auto max-w-7xl px-2.5 sm:px-5 lg:px-6 py-4 sm:py-8">
           {children}
         </div>
       </main>
 
       <footer className="border-t border-border bg-bg-surface no-print">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+        <div className="max-w-7xl mx-auto px-3 sm:px-5 lg:px-6 py-4">
           <p className="text-center text-xs text-text-muted">
             Duskwarden Tools is an independent product and is not affiliated with The Arcane Library, LLC.
           </p>

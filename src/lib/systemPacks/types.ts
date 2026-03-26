@@ -75,6 +75,12 @@ export interface ProvenanceBlock {
   attributionText?: string;
   disclaimer: string;
   generatedAt: string;
+  /** Optional external source reference (e.g. monstro.cc) */
+  external?: {
+    source: 'monstro';
+    slug?: string;
+    url?: string;
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

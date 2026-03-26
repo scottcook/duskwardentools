@@ -113,6 +113,20 @@ export default function EntryDetailPage() {
               <ExportActions outputData={outputData} location="entry_detail" />
             </div>
 
+            {outputData.provenance?.external?.source === 'monstro' && (
+              <div className="text-xs text-text-muted border border-border rounded-lg p-3">
+                Data from{' '}
+                <a 
+                  href={outputData.provenance.external.url || `https://monstro.cc/monster/${outputData.provenance.external.slug}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-accent hover:underline"
+                >
+                  monstro.cc
+                </a>
+              </div>
+            )}
+
             <details className="group border border-border rounded-lg overflow-hidden bg-bg-elevated">
               <summary className="flex items-center justify-between px-4 py-3 text-sm font-semibold text-text-primary cursor-pointer hover:bg-bg-base select-none list-none focus:outline-none focus-visible:ring-2 focus-visible:ring-accent">
                 <span>View Source Text</span>

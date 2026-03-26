@@ -6,6 +6,7 @@ import { CONVERSION_PROFILE_OPTIONS } from '@/lib/conversion/profiles';
 import type { SourceSystem, CreatureRole, DetectionConfidence } from '@/types';
 import type { ConversionProfileId } from '@/lib/conversion/profiles';
 import { Step1ScanBeta } from './Step1ScanBeta';
+import { MonstroBrowserModal } from '@/components/features/MonstroBrowserModal';
 
 const EXAMPLE_STATBLOCK = `Goblin
 AC 15 (leather armor, shield)
@@ -32,6 +33,12 @@ interface Step1SourceProps {
   onCreatureNameChange: (name: string) => void;
   onDescriptionChange: (desc: string) => void;
   onMetadataChange: (key: 'intendedLevel' | 'role', value: number | CreatureRole | undefined) => void;
+  onMonstroSelect?: (
+    text: string,
+    system: SourceSystem,
+    description?: string,
+    external?: { source: 'monstro'; slug?: string; url?: string }
+  ) => void;
   onNext: () => void;
 }
 
@@ -104,10 +111,12 @@ export function Step1Source({
   onCreatureNameChange,
   onDescriptionChange,
   onMetadataChange,
+  onMonstroSelect,
   onNext,
 }: Step1SourceProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showExample, setShowExample] = useState(false);
+  const [showMonstroModal, setShowMonstroModal] = useState(false);
 
   const canProceed = sourceText.trim().length > 10 && isValid !== false;
   const selectedHelper = PROFILE_HELPER[conversionProfileId];
@@ -133,7 +142,7 @@ export function Step1Source({
         {selectedHelper?.compat && (
           <p
             role="note"
-            className="mt-0 px-3 py-2 rounded border border-accent/30 bg-accent/5 text-xs text-text-secondary leading-snug sm:justify-self-end max-w-md"
+            className="mt-0 rounded border border-accent/30 bg-accent/5 px-2.5 py-1.5 text-xs leading-snug text-text-secondary sm:max-w-md sm:justify-self-end sm:px-3 sm:py-2"
           >
             {selectedHelper.compat}
           </p>
@@ -151,7 +160,7 @@ export function Step1Source({
             hint="Helps the parser understand the input format"
           />
           {showDetection && (
-            <div className="mt-2 rounded-lg border border-border bg-bg-elevated px-3 py-2 text-xs leading-snug">
+            <div className="mt-2 rounded-lg border border-border bg-bg-elevated px-2.5 py-2 text-xs leading-snug sm:px-3">
               <p className="text-text-secondary">
                 Detected from pasted text:{' '}
                 <span className="font-medium">{SOURCE_SYSTEM_LABELS[detectedSourceSystem!]}</span>{' '}
@@ -220,6 +229,17 @@ export function Step1Source({
         onAccept={onSourceChange}
       />
 
+      {onMonstroSelect && (
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => setShowMonstroModal(true)}
+          className="w-full sm:w-auto"
+        >
+          Browse Monstro.cc to add a monster!
+        </Button>
+      )}
+
       {/* ── Source stat block textarea ────────────────────── */}
       <div>
         <Textarea
@@ -253,7 +273,7 @@ export function Step1Source({
         {showExample && (
           <div
             id="example-statblock"
-            className="mt-3 rounded-lg border border-border bg-bg-elevated p-3 space-y-2"
+            className="mt-3 space-y-2 rounded-lg border border-border bg-bg-elevated p-2.5 sm:p-3"
           >
             <p className="text-xs font-medium text-text-secondary">Example (SRD Goblin):</p>
             <pre className="text-xs text-text-muted font-mono whitespace-pre-wrap leading-relaxed">
@@ -280,7 +300,7 @@ export function Step1Source({
         <button
           type="button"
           onClick={() => setShowAdvanced(v => !v)}
-          className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-text-secondary hover:bg-bg-elevated transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          className="flex w-full items-center justify-between px-3 py-2.5 text-sm font-medium text-text-secondary transition-colors hover:bg-bg-elevated focus:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:px-4 sm:py-3"
           aria-expanded={showAdvanced}
           aria-controls="advanced-section"
         >
@@ -295,7 +315,7 @@ export function Step1Source({
         {showAdvanced && (
           <div
             id="advanced-section"
-            className="px-4 pb-4 pt-4 bg-bg-elevated border-t border-border space-y-4"
+            className="space-y-4 border-t border-border bg-bg-elevated px-3 pb-3 pt-3 sm:px-4 sm:pb-4 sm:pt-4"
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -350,6 +370,18 @@ export function Step1Source({
           </span>
         )}
       </div>
+
+      <MonstroBrowserModal
+        isOpen={showMonstroModal}
+        onClose={() => setShowMonstroModal(false)}
+        onSelect={(text, system, description, external) => {
+          onSourceChange(text);
+          if (onMonstroSelect) {
+            onMonstroSelect(text, system, description, external);
+          }
+          setShowMonstroModal(false);
+        }}
+      />
     </div>
   );
 }

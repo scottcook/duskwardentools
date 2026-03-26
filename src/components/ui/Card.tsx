@@ -7,9 +7,9 @@ interface CardProps extends HTMLAttributes<HTMLDivElement> {
 
 const paddingStyles = {
   none: '',
-  sm: 'p-4',
-  md: 'p-6',
-  lg: 'p-8',
+  sm: 'p-3 sm:p-4',
+  md: 'p-4 sm:p-5',
+  lg: 'p-4 sm:p-6 lg:p-7',
 };
 
 export function Card({ children, padding = 'md', className = '', ...props }: CardProps) {
@@ -29,7 +29,7 @@ interface CardHeaderProps extends HTMLAttributes<HTMLDivElement> {
 
 export function CardHeader({ children, className = '', ...props }: CardHeaderProps) {
   return (
-    <div className={`border-b border-border pb-4 mb-4 ${className}`} {...props}>
+    <div className={`border-b border-border pb-3 mb-3 sm:pb-4 sm:mb-4 ${className}`} {...props}>
       {children}
     </div>
   );
@@ -66,7 +66,7 @@ interface CardFooterProps extends HTMLAttributes<HTMLDivElement> {
 
 export function CardFooter({ children, className = '', ...props }: CardFooterProps) {
   return (
-    <div className={`border-t border-border pt-4 mt-4 ${className}`} {...props}>
+    <div className={`border-t border-border pt-3 mt-3 sm:pt-4 sm:mt-4 ${className}`} {...props}>
       {children}
     </div>
   );

@@ -223,7 +223,7 @@ export function Step1ScanBeta({ hasExistingText, onAccept }: Step1ScanBetaProps)
 
   return (
     <>
-      <div className="rounded-2xl border border-accent/30 bg-[linear-gradient(135deg,rgba(212,165,116,0.10),rgba(38,38,38,0.92))] p-4 sm:p-5">
+      <div className="rounded-2xl border border-accent/30 bg-[linear-gradient(135deg,rgba(212,165,116,0.10),rgba(38,38,38,0.92))] p-3 sm:p-4">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
@@ -269,7 +269,7 @@ export function Step1ScanBeta({ hasExistingText, onAccept }: Step1ScanBetaProps)
             </p>
           </div>
 
-          <div className="rounded-xl border border-border bg-bg-elevated/70 p-4">
+          <div className="rounded-xl border border-border bg-bg-elevated/70 p-3 sm:p-4">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div>
                 <p className="text-sm font-medium text-text-primary">Private by default</p>
@@ -325,7 +325,7 @@ export function Step1ScanBeta({ hasExistingText, onAccept }: Step1ScanBetaProps)
                 </div>
               </div>
 
-              <div className="space-y-4 rounded-xl border border-border bg-bg-elevated/60 p-4">
+              <div className="space-y-3 rounded-xl border border-border bg-bg-elevated/60 p-3 sm:space-y-4 sm:p-4">
                 {scanStage === 'processing' && (
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
@@ -359,19 +359,19 @@ export function Step1ScanBeta({ hasExistingText, onAccept }: Step1ScanBetaProps)
                     </div>
 
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                      <div className="rounded-lg border border-border bg-bg-base/70 px-3 py-2">
+                      <div className="rounded-lg border border-border bg-bg-base/70 px-2.5 py-1.5 sm:px-3 sm:py-2">
                         <p className="text-xs uppercase tracking-wide text-text-muted">Name</p>
                         <p className="mt-1 text-sm font-medium text-text-primary">{scanSummary.name ?? 'Unknown'}</p>
                       </div>
-                      <div className="rounded-lg border border-border bg-bg-base/70 px-3 py-2">
+                      <div className="rounded-lg border border-border bg-bg-base/70 px-2.5 py-1.5 sm:px-3 sm:py-2">
                         <p className="text-xs uppercase tracking-wide text-text-muted">AC</p>
                         <p className="mt-1 text-sm font-medium text-text-primary">{scanSummary.ac ?? '—'}</p>
                       </div>
-                      <div className="rounded-lg border border-border bg-bg-base/70 px-3 py-2">
+                      <div className="rounded-lg border border-border bg-bg-base/70 px-2.5 py-1.5 sm:px-3 sm:py-2">
                         <p className="text-xs uppercase tracking-wide text-text-muted">HP</p>
                         <p className="mt-1 text-sm font-medium text-text-primary">{scanSummary.hp ?? '—'}</p>
                       </div>
-                      <div className="rounded-lg border border-border bg-bg-base/70 px-3 py-2">
+                      <div className="rounded-lg border border-border bg-bg-base/70 px-2.5 py-1.5 sm:px-3 sm:py-2">
                         <p className="text-xs uppercase tracking-wide text-text-muted">Attacks</p>
                         <p className="mt-1 text-sm font-medium text-text-primary">{scanSummary.attacks?.length ?? 0}</p>
                       </div>
@@ -379,7 +379,7 @@ export function Step1ScanBeta({ hasExistingText, onAccept }: Step1ScanBetaProps)
 
                     <div>
                       <p className="text-sm font-medium text-text-primary">Extracted text preview</p>
-                      <pre className="mt-2 max-h-72 overflow-auto rounded-lg border border-border bg-bg-base/70 p-3 text-xs leading-relaxed whitespace-pre-wrap text-text-muted">
+                      <pre className="mt-2 max-h-72 overflow-auto rounded-lg border border-border bg-bg-base/70 p-2.5 text-xs leading-relaxed whitespace-pre-wrap text-text-muted sm:p-3">
                         {previewText}
                         {result.normalizedText.length > PREVIEW_TEXT_LIMIT ? '\n\n…' : ''}
                       </pre>
@@ -405,7 +405,7 @@ export function Step1ScanBeta({ hasExistingText, onAccept }: Step1ScanBetaProps)
                       </p>
                     </div>
 
-                    <div className="rounded-xl border border-error/30 bg-error/5 p-4">
+                    <div className="rounded-xl border border-error/30 bg-error/5 p-3 sm:p-4">
                       <p className="text-sm font-medium text-text-primary">Why it was rejected</p>
                       <ul className="mt-2 space-y-2 text-sm text-text-muted">
                         {result.reasons.map((reason) => (
@@ -431,7 +431,7 @@ export function Step1ScanBeta({ hasExistingText, onAccept }: Step1ScanBetaProps)
                       <Badge variant="error">Scan failed</Badge>
                       <p className="text-sm text-text-muted">The beta scanner hit a browser or OCR problem.</p>
                     </div>
-                    <div className="rounded-xl border border-error/30 bg-error/5 p-4 text-sm text-text-muted">
+                    <div className="rounded-xl border border-error/30 bg-error/5 p-3 text-sm text-text-muted sm:p-4">
                       {errorMessage}
                     </div>
                     <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">

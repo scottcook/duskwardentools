@@ -101,6 +101,7 @@ function runPackPipeline(
   nameOverride?: string,
   referenceText?: string,
   descriptionOverride?: string,
+  externalImport?: WizardState['externalImport'],
 ): { outputData: OutputCreatureData; validationReport: WizardState['validationReport'] } {
   const outputPackId = getOutputPackId(sourceSystem, settings.conversionProfileId);
   const pack = SYSTEM_PACKS[outputPackId];
@@ -112,6 +113,13 @@ function runPackPipeline(
 
   if (descriptionOverride?.trim()) {
     output.description = descriptionOverride.trim();
+  }
+
+  if (externalImport) {
+    output.provenance = {
+      ...output.provenance,
+      external: externalImport,
+    };
   }
 
   output.outputPackId = outputPackId;
@@ -196,6 +204,7 @@ export function ConversionWizard({
     parsedData: (existingEntry?.parsed_json as ParsedCreatureData | null) ?? null,
     settings: initialSettings(),
     outputData: null,
+    externalImport: existingEntry?.output_json?.provenance?.external,
     referenceStatblock: '',
     validationReport: undefined,
     isStatblockValid: existingEntry ? true : undefined,
@@ -300,6 +309,7 @@ export function ConversionWizard({
           prev.creatureName || undefined,
           prev.referenceStatblock,
           prev.creatureDescription || undefined,
+          prev.externalImport,
         );
         return {
           ...prev,
@@ -329,6 +339,7 @@ export function ConversionWizard({
           prev.creatureName || undefined,
           prev.referenceStatblock,
           prev.creatureDescription || undefined,
+          prev.externalImport,
         );
         return {
           ...prev,
@@ -358,6 +369,7 @@ export function ConversionWizard({
           creatureName || undefined,
           prev.referenceStatblock,
           prev.creatureDescription || undefined,
+          prev.externalImport,
         );
         return {
           ...prev,
@@ -387,6 +399,7 @@ export function ConversionWizard({
           prev.creatureName || undefined,
           prev.referenceStatblock,
           prev.creatureDescription || undefined,
+          prev.externalImport,
         );
         return {
           ...prev,
@@ -411,6 +424,7 @@ export function ConversionWizard({
           prev.creatureName || undefined,
           referenceStatblock,
           prev.creatureDescription || undefined,
+          prev.externalImport,
         );
         return {
           ...prev,
@@ -437,6 +451,7 @@ export function ConversionWizard({
       state.creatureName || undefined,
       state.referenceStatblock,
       state.creatureDescription || undefined,
+      state.externalImport,
     );
     setState(prev => ({
       ...prev,
@@ -479,6 +494,7 @@ export function ConversionWizard({
         prev.creatureName || undefined,
         prev.referenceStatblock,
         prev.creatureDescription || undefined,
+        prev.externalImport,
       );
       return {
         ...prev,
@@ -536,6 +552,7 @@ export function ConversionWizard({
       parsedData: null,
       settings: applyProfileSettings('5e', getDefaultSettings(), getDefaultSettings().conversionProfileId),
       outputData: null,
+      externalImport: undefined,
       referenceStatblock: '',
       validationReport: undefined,
       isStatblockValid: undefined,
@@ -547,7 +564,7 @@ export function ConversionWizard({
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8">
       <div>
         <h1 className="text-2xl font-bold text-text-primary">Create a Duskwarden Stat Card</h1>
         <p className="mt-1 text-text-muted">
@@ -555,7 +572,7 @@ export function ConversionWizard({
         </p>
       </div>
 
-      <div className="pb-8">
+      <div className="pb-6 sm:pb-8">
         <Stepper
           steps={STEPS}
           currentStep={state.step}
@@ -563,7 +580,7 @@ export function ConversionWizard({
         />
       </div>
 
-      <Card padding="lg">
+      <Card padding="md">
         {state.step === 1 && (
           <Step1Source
             sourceText={state.sourceText}
@@ -582,6 +599,17 @@ export function ConversionWizard({
             onCreatureNameChange={handleCreatureNameChange}
             onDescriptionChange={handleDescriptionChange}
             onMetadataChange={handleMetadataChange}
+            onMonstroSelect={(text, system, description, external) => {
+              setState(prev => ({
+                ...prev,
+                sourceText: text,
+                sourceSystem: system,
+                hasManualSourceSystemSelection: true,
+                creatureDescription: description ?? prev.creatureDescription,
+                externalImport: external,
+                settings: applyProfileSettings(system, prev.settings, prev.settings.conversionProfileId),
+              }));
+            }}
             onNext={handleParseAndConvert}
           />
         )}

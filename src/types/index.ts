@@ -115,6 +115,11 @@ export interface SpecialAction {
 }
 
 export type { SystemPackId, ProvenanceBlock } from '@/lib/systemPacks/types';
+export type MonstroProvenance = {
+  source: 'monstro';
+  slug?: string;
+  url?: string;
+};
 import type { SystemPackId, ProvenanceBlock } from '@/lib/systemPacks/types';
 export type { ConversionProfileId, CreatureRole as ConversionRole } from '@/lib/conversion/profiles';
 import type { ConversionProfileId, CreatureRole as ConversionRole } from '@/lib/conversion/profiles';
@@ -225,6 +230,11 @@ export interface WizardState {
   parsedData: ParsedCreatureData | null;
   settings: ConversionSettings;
   outputData: OutputCreatureData | null;
+  externalImport?: {
+    source: 'monstro';
+    slug?: string;
+    url?: string;
+  };
   /** Reference stat block (Shadowdark verify mode) — private, never sent publicly */
   referenceStatblock?: string;
   /** Validation report from the active pack's validate() */
