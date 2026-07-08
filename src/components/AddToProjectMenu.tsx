@@ -74,22 +74,7 @@ export function AddToProjectMenu({
         </span>
       </button>
       {open && (
-        <div
-          role="menu"
-          style={{
-            position: 'absolute',
-            zIndex: 40,
-            top: 'calc(100% + 4px)',
-            left: 0,
-            right: 0,
-            minWidth: 200,
-            background: 'var(--pan)',
-            border: '1px solid var(--line-2)',
-            boxShadow: '0 16px 32px rgba(0,0,0,.6)',
-            maxHeight: 260,
-            overflowY: 'auto',
-          }}
-        >
+        <div className="dropdown-menu" role="menu">
           {projects.length === 0 && (
             <div className="dim" style={{ padding: '10px 12px', fontSize: 13, fontStyle: 'italic' }}>
               No projects yet.

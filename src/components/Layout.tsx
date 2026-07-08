@@ -1,5 +1,5 @@
-import { useState, type ReactNode } from 'react'
-import { NavLink, Link } from 'react-router-dom'
+import { useEffect, useState, type ReactNode } from 'react'
+import { NavLink, Link, useLocation } from 'react-router-dom'
 import { IdentityModal } from './IdentityModal'
 import { FeedbackModal } from './FeedbackModal'
 import { NewsletterModal } from './NewsletterModal'
@@ -20,37 +20,91 @@ const NAV = [
 
 export function Layout({ children }: { children: ReactNode }) {
   const [identity, setIdentity] = useState(false)
+  const [navOpen, setNavOpen] = useState(false)
+  const location = useLocation()
+
+  useEffect(() => {
+    setNavOpen(false)
+  }, [location.pathname])
+
+  useEffect(() => {
+    if (!navOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setNavOpen(false)
+    }
+    document.addEventListener('keydown', onKey)
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = ''
+    }
+  }, [navOpen])
+
+  function closeNav() {
+    setNavOpen(false)
+  }
 
   return (
     <>
       <div className="app">
-        <header className="top">
-          <div className="brand">
-            <h1 className="wm">
-              <Link to="/">
-                <span className="acc">D</span>uskwarden
-              </Link>
-            </h1>
-            <p className="tag">
-              Monster transmutation engine — drag your horrors across the veil, system to system.
-            </p>
-          </div>
-          <div className="meta">
-            Eight tongues spoken
-            <br />
-            Homebrew arithmetic
-            <br />
-            Anno MMXXVI
-          </div>
-        </header>
+        <div className="site-header">
+          <header className="top">
+            <div className="brand">
+              <h1 className="wm">
+                <Link to="/" onClick={closeNav}>
+                  <span className="acc">D</span>uskwarden
+                </Link>
+              </h1>
+              <p className="tag">
+                Monster transmutation engine — drag your horrors across the veil, system to system.
+              </p>
+            </div>
+            <div className="top-end">
+              <div className="meta">
+                Eight tongues spoken
+                <br />
+                Homebrew arithmetic
+                <br />
+                Anno MMXXVI
+              </div>
+              <button
+                type="button"
+                className="nav-toggle"
+                aria-expanded={navOpen}
+                aria-controls="site-nav"
+                onClick={() => setNavOpen((open) => !open)}
+              >
+                <span className="sr-only">{navOpen ? 'Close menu' : 'Open menu'}</span>
+                <span className="nav-toggle-bars" aria-hidden="true">
+                  <span />
+                  <span />
+                  <span />
+                </span>
+              </button>
+            </div>
+          </header>
 
-        <nav className="nav" aria-label="Primary">
+          {navOpen && (
+            <button
+              type="button"
+              className="nav-backdrop"
+              aria-label="Close menu"
+              onClick={closeNav}
+            />
+          )}
+
+          <nav
+            id="site-nav"
+            className={'nav' + (navOpen ? ' nav-open' : '')}
+            aria-label="Primary"
+          >
           {NAV.map((n) => (
             <NavLink
               key={n.to}
               to={n.to}
               end={n.end}
               className={({ isActive }) => 'navlink' + (isActive ? ' on' : '')}
+              onClick={closeNav}
             >
               {n.label}
             </NavLink>
@@ -61,14 +115,22 @@ export function Layout({ children }: { children: ReactNode }) {
               href={DONATE_URL}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={closeNav}
             >
               ♥ Support
             </a>
-            <button className="navlink" onClick={showFeedback}>
+            <button
+              className="navlink"
+              onClick={() => {
+                closeNav()
+                showFeedback()
+              }}
+            >
               Feedback
             </button>
           </div>
-        </nav>
+          </nav>
+        </div>
 
         {IS_DEMO && (
           <div className="demobar">
@@ -80,7 +142,7 @@ export function Layout({ children }: { children: ReactNode }) {
         <main>{children}</main>
 
         <footer className="foot">
-          <span>
+          <span className="foot-copy">
             Duskwarden · transmutation is homebrew arithmetic, not law — the table's ruling is final
           </span>
           <span className="foot-links">
