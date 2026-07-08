@@ -1,190 +1,136 @@
-# Duskwarden Tools
+# Duskwarden
 
-roll for initiative
+A dark, OSR-flavoured **TTRPG monster toolkit**: build campaign **projects**, search
+a **creature library**, add creatures to projects, and **transmute** stat blocks
+between eight game systems.
 
-A creature conversion workbench for tabletop RPG GMs. Paste supported stat blocks, generate compatibility-focused conversions, and organize your campaign content.
+Built to the Claude Design handoff (see [`project/`](project/) and
+[`chats/`](chats/)) and wired to the existing **Duskwarden Tools** Supabase
+database.
 
-## Features
+- **Projects** — create / rename / delete campaigns; each is a vault of creatures.
+- **Creature Library** — search 160+ saved creatures by name, trait, tag, attack,
+  or system; filter by system and by project assignment; add / move / remove a
+  creature to a project; view the full stat block; delete.
+- **Converter** — a faithful build of the design's two-panel transmuter. Edit a
+  beast in the neutral "forge", roll the die, and render it into D&D 5E, OSE/B/X,
+  AD&D 1E, Shadowdark, DCC, Mörk Borg, Pathfinder 2E, or Knave. Copy the block,
+  download JSON, or **save it straight into your library**.
 
-- **Creature Conversion**: Paste stat blocks from 5e, OSE, B/X, or other supported formats and convert them
-- **Adjustable Stats**: Deadliness and durability sliders for quick tuning
-- **Project Organization**: Group creatures and notes by campaign or adventure
-- **Library Search**: Full-text search across all your content
-- **Export Options**: Copy to clipboard, JSON download, and print-friendly cards
+## Stack
 
-## Tech Stack
+- **React 18 + TypeScript + Vite**
+- **React Router** for navigation
+- **@supabase/supabase-js** against the existing Postgres (PostgREST) backend
+- Zero UI dependencies — the Mörk Borg × Shadowdark look is hand-authored CSS
+  ported from the design (`src/styles/theme.css`).
 
-- **Framework**: Next.js 16 (App Router)
-- **Language**: TypeScript
-- **Styling**: Tailwind CSS 4
-- **Database**: Supabase (PostgreSQL with RLS)
-- **Data Access**: Device-scoped storage with Supabase + local fallback
+## Quickstart
 
-## Getting Started
+```bash
+npm install
+cp .env.example .env      # fill in the two Supabase values (below)
+npm run dev               # http://localhost:5173
+```
 
-### Prerequisites
+Build & preview production:
 
-- Node.js 18+
-- npm
-- Supabase project
+```bash
+npm run build
+npm run preview
+```
 
-### Installation
+## Configuration
 
-1. Clone the repository
-2. Install dependencies:
-   ```bash
-   npm install --include=dev
-   ```
+Set these in `.env` (or in your host's env vars, e.g. Vercel Project Settings):
 
-3. Copy the environment example:
-   ```bash
-   cp .env.local.example .env.local
-   ```
+| Variable                 | Where to find it                                   |
+| ------------------------ | -------------------------------------------------- |
+| `VITE_SUPABASE_URL`      | Supabase → Project Settings → API → Project URL    |
+| `VITE_SUPABASE_ANON_KEY` | Supabase → Project Settings → API → publishable key |
 
-4. Update `.env.local` with your Supabase credentials
+For the existing **Duskwarden Tools** project these are:
 
-5. Run database migrations (via Supabase dashboard or CLI)
+```
+VITE_SUPABASE_URL=https://helxjdcxaxzcsvojscyd.supabase.co
+VITE_SUPABASE_ANON_KEY=sb_publishable_5k7pDIfGW04KpQVVCBt8jA_jp8DegoX
+```
 
-6. Start the development server:
-   ```bash
-   npm run dev
-   ```
+The anon/publishable key is safe to ship in a client bundle — it is protected by
+Row Level Security. Never put the **service_role** key here.
 
-### Scripts
+### Demo mode
 
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm run start` - Start production server
-- `npm run lint` - Run ESLint
-- `npm run test` - Run unit tests (watch mode)
-- `npm run test:run` - Run unit tests once
-- `npm run test:e2e` - Run end-to-end tests
+If the two variables are absent (or `VITE_DEMO=true`), the app runs against a
+**localStorage** data layer seeded with a sample bestiary — no network, no
+credentials. A banner makes this obvious. Handy for offline UI work and CI.
 
-## Project Structure
+## How it maps to the existing database
+
+The database identifies users **by device, not by login** — there is no auth
+screen. Row Level Security on every table compares `user_id` / `device_id` to
+`get_device_id()`, which reads the **`x-device-id` HTTP header**. The client
+sends a stable per-browser id on every request (`src/lib/device.ts` +
+`src/lib/supabase.ts`).
+
+Consequences worth knowing:
+
+- A **fresh browser starts empty** — it owns nothing yet. That's correct.
+- Your data is portable via the device id, not an account. The footer's
+  **"your warden's mark"** dialog lets you copy the current id or paste a saved
+  one to reclaim a library on another browser.
+
+Data model (see [`supabase/schema.sql`](supabase/schema.sql) for the full,
+reverse-engineered reference — the live DB already has it):
+
+| Concept            | Table / column                                              |
+| ------------------ | ----------------------------------------------------------- |
+| Project            | `projects` (`name`, `description`, `user_id` = device)      |
+| Creature           | `entries` where `type = 'creature'`                         |
+| Creature in a project | `entries.project_id` → `projects.id` (nullable = library) |
+| Neutral stats      | `entries.parsed_json` (name / ac / hp / level / attacks / …) |
+| Converted block    | `entries.output_json`                                       |
+
+**"Add a creature to a project"** sets that creature's `project_id`; **"remove"**
+sets it back to `null` (the creature returns to the library, never destroyed).
+Deleting a project likewise returns its creatures to the library.
+
+## Project structure
 
 ```
 src/
-├── app/                    # Next.js App Router pages
-│   ├── (auth)/             # Auth routes (login)
-│   ├── app/                # Protected app routes
-│   └── auth/               # Auth callback routes
-├── components/
-│   ├── ui/                 # Design system components
-│   └── features/           # Feature-specific components
-├── lib/
-│   ├── supabase/           # Supabase client setup
-│   ├── parser/             # Stat block parser
-│   └── conversion/         # Conversion engine
-└── types/                  # TypeScript types
+  lib/
+    config.ts          env + demo-mode detection
+    device.ts          per-browser device id (x-device-id)
+    supabase.ts        Supabase client (sends the device header)
+    types.ts           row types mirroring the DB
+    api.ts             DataApi: SupabaseApi + MockApi (chosen by config)
+    mockData.ts        demo-mode seed bestiary
+    convert.ts         the design's transmutation engine (ported)
+    creatureBridge.ts  forge ⇄ entry mapping (save / load)
+    creatureModel.ts   read helpers for heterogeneous creature JSON
+    systems.ts         system codes ⇄ labels
+  components/          Layout, Modal, toasts, cards, menus, dialogs
+  pages/              ProjectsPage, ProjectDetailPage, LibraryPage, ConverterPage
+  styles/theme.css    the full design system
+project/ , chats/     original Claude Design handoff (source of truth for the look)
+supabase/schema.sql   reference schema + RLS
 ```
 
-## System Packs
+## Deploy (Vercel)
 
-Duskwarden uses a **System Pack** architecture so conversions can be truly accurate when lawful data is available, and "assist + verify" when it is not.
+Vite SPA. Set the two `VITE_…` env vars in the project, build command
+`npm run build`, output `dist`. Add a rewrite so client-side routes resolve:
 
-### Available Packs
-
-| Pack ID | Display Name | Data Source | License |
-|---|---|---|---|
-| `osr_generic` | OSR Generic | Heuristic parser + OSR-target conversion | Internal |
-| `dnd5e_srd` | D&D 5e (SRD) | SRD 5.1 parsing enrichment, validation, and attribution | CC BY 4.0 |
-| `shadowdark_private_verify` | For use with Shadowdark RPG (verify) | Compatibility conversion + user-provided reference text | UserProvided |
-
-### D&D 5e SRD — Ingesting Data
-
-A curated seed list of SRD monsters ships with the repo. To replace it with a fuller list from a structured JSON file:
-
-```bash
-npm run ingest:srd -- --input /path/to/srd-monsters.json
-```
-
-**Input format:**
 ```json
-[
-  { "name": "Goblin", "ac": 15, "hp": 7, "cr": "1/4", "movement": "30 ft",
-    "attacks": [{ "name": "Scimitar", "bonus": 4, "damage": "1d6+2" }] }
-]
+{ "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }] }
 ```
 
-> Only ingest content from the D&D 5e SRD (CC BY 4.0). Do NOT ingest content from the PHB, MM, DMG, or any non-SRD source. Attribution is automatically written to `data/packs/dnd5e_srd/license.json` and included in all exports.
+## Verification
 
-### Shadowdark Verify Mode
-
-The `shadowdark_private_verify` pack ships zero proprietary Shadowdark content. Users paste the official stat block text from their own copy of the Shadowdark rules into a **Reference** textarea during the conversion review step. The app:
-
-1. Converts the source stat block using Shadowdark-tuned parameters
-2. Diffs the output against the user's reference field-by-field
-3. Shows an **Accuracy %** score and highlights mismatches
-4. Highlights mismatches so the user can tune the result against their reference
-
-Reference text is stored only in the user's browser (`localStorage`) and is never transmitted to any server.
-
-### Adding a New System Pack
-
-1. **Extend the identifier union** in `src/lib/systemPacks/types.ts`:
-   ```ts
-   export type SystemPackId = 'osr_generic' | 'dnd5e_srd' | 'shadowdark_private_verify' | 'your_new_pack';
-   ```
-
-2. **Create the pack file** at `src/lib/systemPacks/packs/yourNewPack.ts` implementing `SystemPack`:
-   ```ts
-   export const yourNewPack: SystemPack = {
-     id: 'your_new_pack',
-     displayName: 'Your Pack Name',
-     description: 'One-line description shown in UI.',
-     license: { type: 'CC-BY-4.0', attributionText: '...' },
-     canAutoFindStatblocks: false,
-     requiresUserReference: false,
-     parseSourceStatblock(text) { /* use parseStatBlock from @/lib/parser */ },
-     convertToTarget(parsed, options) { /* use buildConvertedStat from conversionUtils */ },
-     validate(converted, reference) { /* use generateValidationReport from validateUtils */ },
-   };
-   ```
-
-3. **Register it** in `src/lib/systemPacks/index.ts`:
-   ```ts
-   import { yourNewPack } from './packs/yourNewPack';
-   
-   export const SYSTEM_PACKS = {
-     // ...existing packs...
-     your_new_pack: yourNewPack,
-   };
-   
-   export const SYSTEM_PACK_OPTIONS = [
-     // ...existing options...
-     { value: 'your_new_pack', label: yourNewPack.displayName, description: yourNewPack.description },
-   ];
-   ```
-
-4. **Write tests** in `tests/unit/systemPacks.test.ts` — at minimum test `convertToTarget` stamps the correct `outputPackId` and `validate` returns a report.
-
-### Needed Inputs Checklist
-
-Before deploying to production, provide:
-
-- [ ] **SRD 5.1 monster JSON**: A structured JSON file of all SRD monsters (or confirm the seed list in `data/packs/dnd5e_srd/monsters.json` is sufficient). Run `npm run ingest:srd -- --input <path>` to replace the seed data.
-- [ ] **Supabase credentials**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` in `.env.local`.
-- [ ] **Shadowdark verify mode**: No data needed — users paste reference text they own at runtime.
-- [ ] **Newsletter signup (optional)**: Create a form at [Formspree](https://formspree.io) with destination `duskwardentools@gmail.com`, then set `NEXT_PUBLIC_FORMSPREE_NEWSLETTER_ID` to the form ID. If unset, the modal falls back to a `mailto:` link.
-
-## Launch Positioning
-
-For launch copy, present Duskwarden as a **compatibility and conversion aid**, not an official rules reference.
-
-- Say `compatibility conversion`, `reference comparison`, or `review before play`.
-- Do not imply that generated output exactly matches official bestiary entries.
-- Keep Shadowdark messaging compatibility-only and independent.
-
----
-
-## Legal Notice
-
-**Duskwarden Tools is an independent product and is not affiliated with The Arcane Library, LLC.**
-
-- Content labeled "for use with Shadowdark RPG" indicates compatibility only; it does not imply official status.
-- D&D 5e SRD data is used under CC BY 4.0. Attribution text is included in all exports from the `dnd5e_srd` pack.
-- No proprietary Shadowdark RPG rules text is embedded in or shipped with this application.
-
-## License
-
-MIT
+- Typecheck + production build are clean (`npm run build`).
+- All three required flows — **create a project**, **search the library**, and
+  **add a creature to a project** — plus the converter's save-to-library loop
+  were driven end-to-end in a headless browser (demo mode).
+- The real Supabase path (insert/select/assign under the `anon` role + device
+  header) and RLS isolation were validated directly against the live database.
