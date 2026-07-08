@@ -9,11 +9,12 @@ export default function App() {
   return (
     <Layout>
       <Routes>
-        <Route path="/" element={<ProjectsPage />} />
+        <Route path="/" element={<Navigate to="/convert" replace />} />
+        <Route path="/convert" element={<ConverterPage />} />
+        <Route path="/projects" element={<ProjectsPage />} />
         <Route path="/projects/:id" element={<ProjectDetailPage />} />
         <Route path="/library" element={<LibraryPage />} />
-        <Route path="/convert" element={<ConverterPage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to="/convert" replace />} />
       </Routes>
     </Layout>
   )

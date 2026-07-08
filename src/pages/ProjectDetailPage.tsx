@@ -73,7 +73,7 @@ export function ProjectDetailPage() {
   async function deleteProject() {
     await api.deleteProject(id)
     notify(`“${project?.name}” dissolved`)
-    navigate('/')
+    navigate('/projects')
   }
 
   if (project === undefined || creatures === null) {
@@ -86,7 +86,7 @@ export function ProjectDetailPage() {
         <EmptyState
           title="Project not found"
           action={
-            <Link className="btn btn-gold" to="/">
+            <Link className="btn btn-gold" to="/projects">
               ← Back to projects
             </Link>
           }
@@ -100,7 +100,7 @@ export function ProjectDetailPage() {
   return (
     <>
       <p style={{ margin: '24px 0 0' }}>
-        <Link className="mn" to="/" style={{ fontSize: 11, letterSpacing: 1 }}>
+        <Link className="mn" to="/projects" style={{ fontSize: 12, letterSpacing: 1 }}>
           ← All projects
         </Link>
       </p>

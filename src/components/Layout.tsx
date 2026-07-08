@@ -1,13 +1,21 @@
 import { useState, type ReactNode } from 'react'
 import { NavLink, Link } from 'react-router-dom'
-import { Textures } from './Textures'
 import { IdentityModal } from './IdentityModal'
+import { FeedbackModal } from './FeedbackModal'
+import { NewsletterModal } from './NewsletterModal'
+import { NewsletterSignupLink } from './NewsletterSignupLink'
+import { SupportLink } from './SupportLink'
+import { DONATE_URL } from '../lib/contact'
 import { IS_DEMO } from '../lib/config'
 
+function showFeedback() {
+  window.dispatchEvent(new CustomEvent('duskwarden-show-feedback'))
+}
+
 const NAV = [
-  { to: '/', label: 'Projects', end: true },
-  { to: '/library', label: 'Library', end: false },
   { to: '/convert', label: 'Converter', end: false },
+  { to: '/projects', label: 'Projects', end: false },
+  { to: '/library', label: 'Library', end: false },
 ]
 
 export function Layout({ children }: { children: ReactNode }) {
@@ -15,7 +23,6 @@ export function Layout({ children }: { children: ReactNode }) {
 
   return (
     <>
-      <Textures />
       <div className="app">
         <header className="top">
           <div className="brand">
@@ -48,6 +55,19 @@ export function Layout({ children }: { children: ReactNode }) {
               {n.label}
             </NavLink>
           ))}
+          <div className="nav-aux">
+            <a
+              className="navlink"
+              href={DONATE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              ♥ Support
+            </a>
+            <button className="navlink" onClick={showFeedback}>
+              Feedback
+            </button>
+          </div>
         </nav>
 
         {IS_DEMO && (
@@ -63,8 +83,13 @@ export function Layout({ children }: { children: ReactNode }) {
           <span>
             Duskwarden · transmutation is homebrew arithmetic, not law — the table's ruling is final
           </span>
-          <span>
-            <button className="link-btn mn" style={{ fontSize: 10.5 }} onClick={() => setIdentity(true)}>
+          <span className="foot-links">
+            <SupportLink />
+            <NewsletterSignupLink />
+            <button className="foot-link" onClick={showFeedback}>
+              ✎ send word
+            </button>
+            <button className="foot-link" onClick={() => setIdentity(true)}>
               ✦ your warden's mark
             </button>
           </span>
@@ -72,6 +97,8 @@ export function Layout({ children }: { children: ReactNode }) {
       </div>
 
       {identity && <IdentityModal onClose={() => setIdentity(false)} />}
+      <FeedbackModal />
+      <NewsletterModal />
     </>
   )
 }

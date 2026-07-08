@@ -1,10 +1,21 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { BEASTS, format, plain, type ForgeMonster } from '../lib/convert'
 import { forgeToNewCreature } from '../lib/creatureBridge'
 import { CONVERTER_SYSTEMS } from '../lib/systems'
+import {
+  SOURCEBOOK_OPTIONS,
+  fetchMonsterDetail,
+  fetchMonsterIndex,
+  monstroToForge,
+  pickPortrayal,
+  sourcebookLabel,
+  type MonstroIndexItem,
+} from '../lib/monstro'
 import { api } from '../lib/api'
 import { useToast } from '../components/ToastProvider'
+import { D20Die } from '../components/D20Die'
+import { parseStatBlock, systemLabelForParse } from '../lib/parseStatBlock'
 
 type Tab = 'scribe' | 'forge' | 'tome'
 
@@ -35,6 +46,19 @@ export function ConverterPage() {
   const [cm, setCm] = useState<ForgeMonster>({ ...BEASTS[0] })
   const [tgtDone, setTgtDone] = useState('shadowdark')
   const [scribe, setScribe] = useState(SCRIBE_SAMPLE)
+  const [parseHint, setParseHint] = useState('')
+  const [parseWarnings, setParseWarnings] = useState<string[]>([])
+
+  const srcOverridden = useRef(false)
+  const scribeDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Tome tab — monstro.cc bestiary
+  const [tomeSearch, setTomeSearch] = useState('')
+  const [tomeBook, setTomeBook] = useState('')
+  const [tomeIndex, setTomeIndex] = useState<MonstroIndexItem[] | null>(null)
+  const [tomeLoading, setTomeLoading] = useState(false)
+  const [tomeError, setTomeError] = useState('')
+  const [tomeBusySlug, setTomeBusySlug] = useState<string | null>(null)
 
   const iv = useRef<ReturnType<typeof setInterval> | null>(null)
   const to = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -45,8 +69,41 @@ export function ConverterPage() {
       if (iv.current) clearInterval(iv.current)
       if (to.current) clearTimeout(to.current)
       if (ct.current) clearTimeout(ct.current)
+      if (scribeDebounce.current) clearTimeout(scribeDebounce.current)
     }
   }, [])
+
+  useEffect(() => {
+    if (tab !== 'scribe') return
+    if (scribeDebounce.current) clearTimeout(scribeDebounce.current)
+
+    scribeDebounce.current = setTimeout(() => {
+      const result = parseStatBlock(scribe)
+      setParseWarnings(result.warnings)
+
+      if (result.fieldsFound.length >= 2) {
+        setM(result.forge)
+        setSel(-1)
+        if (!srcOverridden.current && result.confidence !== 'none') {
+          setSrc(result.system)
+        }
+        const detected = systemLabelForParse(result.system)
+        setParseHint(
+          srcOverridden.current
+            ? `✓ Read as ${detected} — ${result.fieldsFound.length} fields bound. Source set manually to ${systemLabelForParse(src)}.`
+            : `✓ Deciphered as ${detected} — ${result.fieldsFound.length} fields bound into the forge.`,
+        )
+      } else if (scribe.trim().length >= 12) {
+        setParseHint('Could not read much from that block — try the Forge tab to enter fields by hand.')
+      } else {
+        setParseHint('')
+      }
+    }, 400)
+
+    return () => {
+      if (scribeDebounce.current) clearTimeout(scribeDebounce.current)
+    }
+  }, [scribe, tab, src])
 
   const doConvert = useCallback(
     (targetOverride?: string) => {
@@ -75,6 +132,61 @@ export function ConverterPage() {
   function pickBeast(i: number) {
     setSel(i)
     setM({ ...BEASTS[i] })
+  }
+
+  const loadTomeIndex = useCallback(async () => {
+    setTomeLoading(true)
+    setTomeError('')
+    try {
+      setTomeIndex(await fetchMonsterIndex())
+    } catch {
+      setTomeError('The tome would not open — monstro.cc could not be reached.')
+    } finally {
+      setTomeLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (tab === 'tome' && tomeIndex === null && !tomeLoading) {
+      void loadTomeIndex()
+    }
+  }, [tab, tomeIndex, tomeLoading, loadTomeIndex])
+
+  const tomeResults = useMemo(() => {
+    let result = tomeIndex ?? []
+    const q = tomeSearch.trim().toLowerCase()
+    if (q) {
+      result = result.filter(
+        (mon) =>
+          mon.title.toLowerCase().includes(q) ||
+          mon.type?.toLowerCase().includes(q) ||
+          mon.biome?.toLowerCase().includes(q),
+      )
+    }
+    if (tomeBook) {
+      result = result.filter((mon) => (mon.sourcebooks ?? []).some((s) => s.includes(tomeBook)))
+    }
+    return { shown: result.slice(0, 50), total: result.length }
+  }, [tomeIndex, tomeSearch, tomeBook])
+
+  async function pickMonstro(item: MonstroIndexItem) {
+    if (tomeBusySlug) return
+    setTomeBusySlug(item.slug)
+    setTomeError('')
+    try {
+      const detail = await fetchMonsterDetail(item.slug)
+      const portrayal = pickPortrayal(detail, tomeBook)
+      if (!portrayal) throw new Error('No stat block found')
+      const forged = monstroToForge(item, detail, portrayal)
+      setM(forged)
+      setSel(-1)
+      setTab('forge')
+      notify(`“${forged.name}” drawn from the tome — review, then transmute`)
+    } catch {
+      setTomeError('That page of the tome is torn — try another creature.')
+    } finally {
+      setTomeBusySlug(null)
+    }
   }
 
   function onTgt(v: string) {
@@ -151,7 +263,10 @@ export function ConverterPage() {
             <select
               className="sel"
               value={src}
-              onChange={(e) => setSrc(e.target.value)}
+              onChange={(e) => {
+                srcOverridden.current = true
+                setSrc(e.target.value)
+              }}
               aria-label="Source system"
             >
               {CONVERTER_SYSTEMS.map((s) => (
@@ -179,16 +294,30 @@ export function ConverterPage() {
               <textarea
                 className="ta"
                 value={scribe}
-                onChange={(e) => setScribe(e.target.value)}
+                onChange={(e) => {
+                  if (e.target.value.trim().length < 8) srcOverridden.current = false
+                  setScribe(e.target.value)
+                }}
                 aria-label="Paste stat block"
               />
-              <p className="hint">
-                Paste a stat block here for reference. Fine-tune the values in the{' '}
-                <button className="link-btn" onClick={() => setTab('forge')}>
-                  Forge
-                </button>{' '}
-                tab, then transmute.
-              </p>
+              {parseHint ? (
+                <p className="hint parse-hint">{parseHint}</p>
+              ) : (
+                <p className="hint">
+                  Paste a stat block — the warden reads most tongues and binds fields into the{' '}
+                  <button className="link-btn" onClick={() => setTab('forge')}>
+                    Forge
+                  </button>
+                  . Garbage in, curses out.
+                </p>
+              )}
+              {parseWarnings.length > 0 && (
+                <ul className="parse-warn" role="status">
+                  {parseWarnings.map((w) => (
+                    <li key={w}>{w}</li>
+                  ))}
+                </ul>
+              )}
             </div>
           )}
 
@@ -312,25 +441,106 @@ export function ConverterPage() {
 
           {tab === 'tome' && (
             <div className="pbody">
-              <div className="tlist">
-                {BEASTS.map((b, i) => (
-                  <button
-                    key={b.name}
-                    className={'trow' + (i === sel ? ' on' : '')}
-                    onClick={() => pickBeast(i)}
-                  >
-                    <span className="tn">{b.name}</span>
-                    <span className="te">{b.ep}</span>
-                    <span className="th">HD {b.hd}</span>
-                  </button>
-                ))}
+              <div className="toolbar" style={{ marginBottom: 14 }}>
+                <div className="searchbox">
+                  <span className="sicon" aria-hidden="true">
+                    ⚲
+                  </span>
+                  <input
+                    className="search-in"
+                    type="search"
+                    placeholder="Search the bestiary…"
+                    value={tomeSearch}
+                    onChange={(e) => setTomeSearch(e.target.value)}
+                    aria-label="Search monsters"
+                  />
+                </div>
+                <select
+                  className="filter-sel"
+                  value={tomeBook}
+                  onChange={(e) => setTomeBook(e.target.value)}
+                  aria-label="Filter by sourcebook"
+                >
+                  {SOURCEBOOK_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
               </div>
-              <p className="hint">Five specimens from the warden's own tome. Choose one, then transmute.</p>
+
+              {tomeError && (
+                <p className="tome-error" role="alert">
+                  {tomeError}{' '}
+                  <button className="link-btn" onClick={() => void loadTomeIndex()}>
+                    Try again
+                  </button>
+                </p>
+              )}
+
+              <div className="tlist tome-list">
+                {!tomeSearch.trim() && !tomeBook && (
+                  <>
+                    <p className="tome-group">Warden's specimens</p>
+                    {BEASTS.map((b, i) => (
+                      <button
+                        key={b.name}
+                        className={'trow' + (i === sel ? ' on' : '')}
+                        onClick={() => pickBeast(i)}
+                      >
+                        <span className="tn">{b.name}</span>
+                        <span className="te">{b.ep}</span>
+                        <span className="th">HD {b.hd}</span>
+                      </button>
+                    ))}
+                    <p className="tome-group">From the great tome · monstro.cc</p>
+                  </>
+                )}
+
+                {tomeLoading && <p className="hint">Unsealing the tome…</p>}
+
+                {!tomeLoading &&
+                  tomeResults.shown.map((mon) => (
+                    <button
+                      key={mon.slug}
+                      className="trow"
+                      onClick={() => void pickMonstro(mon)}
+                      disabled={tomeBusySlug !== null}
+                    >
+                      <span className="tn">
+                        {tomeBusySlug === mon.slug ? '… ' : ''}
+                        {mon.title}
+                      </span>
+                      <span className="te">
+                        {[mon.type, mon.biome].filter(Boolean).join(' · ') || mon.description}
+                      </span>
+                      <span className="th">{sourcebookLabel(mon.sourcebooks?.[0])}</span>
+                    </button>
+                  ))}
+
+                {!tomeLoading && tomeIndex !== null && tomeResults.shown.length === 0 && (
+                  <p className="hint">No creatures answer that name. Try another search.</p>
+                )}
+              </div>
+
+              {!tomeLoading && tomeResults.total > 50 && (
+                <p className="hint">
+                  Showing 50 of {tomeResults.total.toLocaleString()} — narrow your search.
+                </p>
+              )}
+              <p className="hint">
+                Bestiary data from{' '}
+                <a href="https://monstro.cc" target="_blank" rel="noopener noreferrer">
+                  monstro.cc
+                </a>{' '}
+                — an independent OSR bestiary. Choose a creature to load it into the forge.
+              </p>
             </div>
           )}
 
           <div className="cbar">
-            <div className={'die' + (rolling ? ' roll' : '')}>
+            <div className="diebox" aria-hidden="true">
+              <D20Die rolling={rolling} />
               <span className="dienum">{face}</span>
             </div>
             <button className="go" onClick={() => doConvert()} disabled={rolling}>

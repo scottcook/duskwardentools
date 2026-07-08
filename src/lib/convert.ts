@@ -1,10 +1,24 @@
 /**
- * Monster transmutation — a faithful TypeScript port of the design prototype's
- * conversion engine (project/Duskwarden.dc.html → support.js `format()` et al).
+ * Monster transmutation — renders the neutral "forge" model into a target
+ * system's stat block.
  *
- * The prototype works on a small neutral "forge" model and renders a target
- * system's stat block. We keep the arithmetic and wording identical so the UI
- * matches the approved design pixel-for-pixel in behaviour.
+ * Each system section below follows that game's published math as closely as
+ * a heuristic converter can:
+ *  - OSE/B/X:   monster attack matrix (THAC0), fighter-equivalent saves,
+ *               XP-by-HD award table, 19 − AC descending conversion.
+ *  - AD&D 1E:   20 − AC descending conversion (1E unarmored = AC 10),
+ *               Monster Manual field order.
+ *  - D&D 5E:    HP = HD×d8 average + CON mod × HD (dice expression matches
+ *               the total), attack = proficiency + best ability mod,
+ *               CR/XP ladder by HD.
+ *  - Shadowdark: level = HD, attack bonus = level, stats derived from
+ *               HD/speed/kind.
+ *  - DCC:       Init from speed, saves ≈ half HD, SP line, Action Die.
+ *  - Mörk Borg: player-facing (no attack bonus), armor as damage reduction
+ *               dice, no alignment.
+ *  - PF2E:      GM Core creature-building benchmarks (moderate road) keyed
+ *               to level = HD − 1.
+ *  - Knave:     attack bonus = HD, Knave armor tier names.
  */
 
 export interface ForgeMonster {
@@ -136,118 +150,199 @@ const AL_LABEL: Record<string, string> = { L: 'Lawful', N: 'Neutral', C: 'Chaoti
 const hit = (n: number) => (n >= 0 ? '+' : '−') + Math.abs(n)
 const lo = (s: string) => String(s).toLowerCase()
 
+/** B/X / OSE monster attack matrix: HD → [THAC0, attack bonus]. */
+function oseThac0(hd: number): [number, number] {
+  if (hd <= 7) return [20 - hd, hd - 1] // HD 1 → 19 [0], HD 2 → 18 [+1] …
+  if (hd <= 9) return [12, 7]
+  if (hd <= 11) return [11, 8]
+  if (hd <= 13) return [10, 9]
+  return [9, 10]
+}
+
+/** OSE XP awards by HD (base values, no special-ability bonus). */
+const OSE_XP: Record<number, number> = {
+  1: 10, 2: 20, 3: 35, 4: 75, 5: 175, 6: 275, 7: 450, 8: 650,
+  9: 900, 10: 900, 11: 1100, 12: 1100,
+}
+
+/** 5E CR ladder by HD with the PHB XP value for each rating. */
+const CR_BY_HD: string[] = [
+  '1/4 (50 XP)', // HD 1
+  '1 (200 XP)', // HD 2
+  '2 (450 XP)', // HD 3
+  '3 (700 XP)', // HD 4
+  '4 (1,100 XP)', // HD 5
+  '5 (1,800 XP)', // HD 6
+  '6 (2,300 XP)', // HD 7
+  '7 (2,900 XP)', // HD 8
+  '8 (3,900 XP)', // HD 9
+  '9 (5,000 XP)', // HD 10
+  '10 (5,900 XP)', // HD 11
+  '11 (7,200 XP)', // HD 12
+]
+
+const mod = (score: number) => Math.floor((score - 10) / 2)
+
+/** "2 Claws" → { count: 2, name: "claw" }; "Bite" → { count: 1, name: "bite" } */
+function atkParts(n: string): { count: number; name: string } {
+  const m2 = n.match(/^(\d+)\s+(.*)$/)
+  if (!m2) return { count: 1, name: lo(n) }
+  // OSE/Shadowdark convention writes repeated attacks in the singular.
+  return { count: +m2[1], name: lo(m2[2]).replace(/s$/, '') }
+}
+
 /** Render a forge monster into a target system's stat block. */
 export function format(sys: string, m: ForgeMonster): FormattedBlock {
   const hd = Math.max(1, +m.hd || 1)
   const asc = +m.ac || 10
   const mv = +m.speed || 30
   const ml = +m.ml || 8
-  const hp = Math.max(1, Math.round(hd * 4.5))
-  const dsc = 19 - asc
+  const hp = Math.max(1, Math.round(hd * 4.5)) // HD × d8 average
+  const dscBX = 19 - asc // B/X: unarmored = AC 9 [10]
+  const dsc1e = 20 - asc // AD&D: unarmored = AC 10
   const A = parseAttacks(m.atkText)
   const T = parseTraits(m.traitsText)
   const AL = AL_LABEL[m.al as string] || 'Neutral'
+  const kind = lo(m.kind || '')
+  const beastly = /beast|animal|vermin|ooze/.test(kind)
+  const mindless = /undead|construct|plant/.test(kind)
 
   let badge = ''
   let rows: StatRow[] = []
 
   if (sys === 'dnd5e') {
-    const cr =
-      hd <= 1 ? '1/4 (50 XP)' : hd <= 2 ? '1 (200 XP)' : hd <= 4 ? '3 (700 XP)' : '5 (1,800 XP)'
+    // Ability array: STR scales with HD, DEX fixed brute-average, CON funds
+    // bonus HP, INT/CHA follow creature kind.
+    const str = 10 + Math.min(hd, 8)
+    const dex = 14
+    const con = 10 + Math.min(hd, 6)
+    const int = beastly ? 3 : mindless ? 6 : /humanoid|fey|fiend/.test(kind) ? 10 : 7
+    const cha = beastly || mindless ? 6 : 10
+    const conBonus = mod(con) * hd
+    const hp5e = hp + conBonus
+    const prof = hd <= 4 ? 2 : hd <= 8 ? 3 : 4
+    const atk = prof + Math.max(mod(str), mod(dex))
     badge = 'Dungeons & Dragons · Fifth Edition'
     rows = [
       { k: 'Armor Class', v: String(asc) },
-      { k: 'Hit Points', v: hp + ' (' + hd + 'd8' + (hd > 2 ? '+' + hd : '') + ')' },
+      {
+        k: 'Hit Points',
+        v: hp5e + ' (' + hd + 'd8' + (conBonus > 0 ? '+' + conBonus : '') + ')',
+      },
       { k: 'Speed', v: mv + ' ft.' },
       {
         k: 'Abilities',
-        v:
-          'STR ' +
-          (10 + Math.min(hd, 8)) +
-          ', DEX 14, CON ' +
-          (10 + Math.min(hd, 6)) +
-          ', INT 7, WIS 10, CHA 6',
+        v: `STR ${str}, DEX ${dex}, CON ${con}, INT ${int}, WIS 10, CHA ${cha}`,
       },
       {
         k: 'Actions',
         v: A.map(
-          (a) => a.n + ' ' + hit(2 + Math.ceil(hd / 2)) + ' to hit (' + a.d + (a.note ? ', ' + a.note : '') + ')',
+          (a) => a.n + ' ' + hit(atk) + ' to hit (' + a.d + (a.note ? ', ' + a.note : '') + ')',
         ).join(' or '),
       },
-      { k: 'Challenge', v: cr },
+      { k: 'Challenge', v: CR_BY_HD[Math.min(hd, 12) - 1] },
     ]
   } else if (sys === 'ose') {
+    // Monsters save as fighters of level = HD (OSE monster save table).
     const sv =
-      hd <= 3 ? 'D12 W13 P14 B15 S16' : hd <= 6 ? 'D10 W11 P12 B13 S14' : 'D8 W9 P10 B10 S12'
-    const xp: Record<number, number> = { 1: 10, 2: 20, 3: 35, 4: 75, 5: 175, 6: 275 }
+      hd <= 3
+        ? 'D12 W13 P14 B15 S16'
+        : hd <= 6
+          ? 'D10 W11 P12 B13 S14'
+          : hd <= 9
+            ? 'D8 W9 P10 B10 S12'
+            : 'D6 W7 P8 B8 S10'
+    const [thac0, ab] = oseThac0(hd)
     badge = 'Old-School Essentials · B/X'
     rows = [
-      { k: 'AC', v: dsc + ' [' + asc + ']' },
+      { k: 'AC', v: dscBX + ' [' + asc + ']' },
       { k: 'HD', v: hd + ' (' + hp + ' hp)' },
       {
         k: 'Att',
-        v: A.map((a) => lo(a.n) + ' (' + a.d + (a.note ? ', ' + a.note : '') + ')').join(', '),
+        v: A.map((a) => {
+          const p = atkParts(a.n)
+          return p.count + ' × ' + p.name + ' (' + a.d + (a.note ? ' + ' + a.note : '') + ')'
+        }).join(', '),
       },
-      { k: 'THAC0', v: 19 - Math.min(hd, 9) + ' [' + hit(Math.min(hd, 9)) + ']' },
+      { k: 'THAC0', v: thac0 + ' [' + hit(ab) + ']' },
       { k: 'MV', v: mv * 4 + '′ (' + Math.round((mv * 4) / 30) * 10 + '′)' },
       { k: 'SV', v: sv },
       { k: 'ML', v: String(ml) },
       { k: 'AL', v: AL },
-      { k: 'XP', v: String(xp[hd] || hd * 80) },
+      { k: 'XP', v: String(OSE_XP[Math.min(hd, 12)] || 1100) },
     ]
   } else if (sys === 'add1') {
-    const natt = A.reduce((n, a) => {
-      const c = a.n.match(/^(\d+)\s/)
-      return n + (c ? +c[1] : 1)
-    }, 0)
+    const natt = A.reduce((n, a) => n + atkParts(a.n).count, 0)
+    const intel = beastly ? 'Animal' : mindless ? 'Low' : 'Average'
     badge = 'Advanced D&D · First Edition'
     rows = [
       { k: 'Frequency', v: 'Uncommon' },
       { k: 'No. Appearing', v: '2–8' },
-      { k: 'Armor Class', v: String(dsc) },
+      { k: 'Armor Class', v: String(dsc1e) },
       { k: 'Move', v: Math.round((mv * 2) / 5) + '″' },
       { k: 'Hit Dice', v: String(hd) },
       { k: '% in Lair', v: '25%' },
+      { k: 'Treasure Type', v: 'Nil' },
       { k: 'No. of Attacks', v: String(natt) },
       { k: 'Damage/Attack', v: A.map((a) => a.d).join(' / ') },
       { k: 'Special Attacks', v: T[0] ? T[0].h : 'Nil' },
       { k: 'Special Defenses', v: T[1] ? T[1].h : 'Nil' },
+      { k: 'Magic Resistance', v: 'Standard' },
+      { k: 'Intelligence', v: intel },
       { k: 'Alignment', v: AL },
       { k: 'Size', v: 'M' },
     ]
   } else if (sys === 'shadowdark') {
+    // Level = HD; attack bonus = level; stats derived from HD, speed, kind.
+    const s = Math.min(hd, 4)
+    const d = mv >= 40 ? 3 : mv >= 30 ? 2 : mv >= 20 ? 0 : -1
+    const i = beastly ? -3 : mindless ? -2 : 0
+    const ch = beastly || mindless ? -2 : 0
     badge = 'Shadowdark RPG'
     rows = [
       { k: 'AC', v: String(asc) },
       { k: 'HP', v: String(hp) },
       {
         k: 'ATK',
-        v: A.map(
-          (a) => lo(a.n) + ' ' + hit(hd) + ' (' + a.d + (a.note ? ', ' + a.note : '') + ')',
-        ).join(' and '),
+        v: A.map((a) => {
+          const p = atkParts(a.n)
+          return (
+            (p.count > 1 ? p.count + ' ' : '') +
+            p.name +
+            ' ' +
+            hit(hd) +
+            ' (' +
+            a.d +
+            (a.note ? ' + ' + a.note : '') +
+            ')'
+          )
+        }).join(' and '),
       },
       { k: 'MV', v: mv >= 40 ? 'double near' : mv <= 15 ? 'close' : 'near' },
       {
         k: 'Stats',
-        v: 'S ' + hit(Math.min(hd, 4)) + ', D +2, C +0, I −2, W +0, Ch −2',
+        v: `S ${hit(s)}, D ${hit(d)}, C +0, I ${hit(i)}, W +0, Ch ${hit(ch)}`,
       },
       { k: 'AL', v: (m.al as string) || 'N' },
       { k: 'LV', v: String(hd) },
     ]
   } else if (sys === 'dcc') {
+    const init = mv >= 40 ? 2 : mv <= 15 ? -1 : 1
     badge = 'Dungeon Crawl Classics'
     rows = [
-      { k: 'Init', v: '+1' },
+      { k: 'Init', v: hit(init) },
       {
         k: 'Atk',
         v: A.map(
-          (a) => lo(a.n) + ' ' + hit(hd) + ' melee (' + a.d + (a.note ? ' plus ' + a.note : '') + ')',
+          (a) =>
+            lo(a.n) + ' ' + hit(hd) + ' melee (' + a.d + (a.note ? ' plus ' + a.note : '') + ')',
         ).join(' or '),
       },
       { k: 'AC', v: String(asc) },
       { k: 'HD', v: hd + 'd8 (' + hp + ' hp)' },
       { k: 'MV', v: mv + '′' },
       { k: 'Act', v: '1d20' },
+      { k: 'SP', v: T.length ? T.map((t) => lo(t.h)).join(', ') : 'none' },
       {
         k: 'SV',
         v:
@@ -261,42 +356,80 @@ export function format(sys: string, m: ForgeMonster): FormattedBlock {
       { k: 'AL', v: (m.al as string) || 'N' },
     ]
   } else if (sys === 'morkborg') {
-    const arm = asc >= 14 ? '−d4 (heavy hide)' : asc >= 12 ? '−d2 (scraps)' : 'none'
+    // Player-facing: no attack bonus, no alignment; armor is a DR die.
+    const arm =
+      asc >= 16
+        ? '−d6 (heavy plate)'
+        : asc >= 14
+          ? '−d4 (heavy hide)'
+          : asc >= 12
+            ? '−d2 (scraps)'
+            : 'none'
     badge = 'Mörk Borg'
     rows = [
-      { k: 'HP', v: String(Math.max(3, hd * 3)) },
+      { k: 'HP', v: String(Math.max(4, hd * 4)) },
       { k: 'Morale', v: String(ml) },
       { k: 'Armor', v: arm },
       {
         k: 'Attack',
-        v: A.map((a) => lo(a.n).replace(/^\d+\s*/, '') + ' d' + a.d.split('d')[1]).join(' or '),
+        v: A.map(
+          (a) =>
+            atkParts(a.n).name.replace(/^\d+\s*/, '') +
+            ' d' +
+            a.d.split('d')[1] +
+            (a.note ? ' (' + a.note + ')' : ''),
+        ).join(' or '),
       },
     ]
   } else if (sys === 'pf2e') {
+    // GM Core creature-building benchmarks, moderate road, level = HD − 1.
+    const lvl = hd - 1
+    const ac2e = Math.floor(15 + lvl * 1.5)
+    const hp2e = lvl <= 0 ? 15 : 10 * lvl + 10
+    const dmgBonus = lvl + 2
     badge = 'Pathfinder · Second Edition'
     rows = [
-      { k: 'Level', v: 'Creature ' + (hd - 1) },
-      { k: 'Perception', v: hit(hd + 2) },
-      { k: 'AC', v: String(asc + 2) },
-      { k: 'HP', v: String(Math.round(hp * 1.5)) },
+      { k: 'Level', v: 'Creature ' + lvl },
+      { k: 'Perception', v: hit(lvl + 6) },
+      { k: 'AC', v: String(ac2e) },
+      { k: 'HP', v: String(hp2e) },
       {
         k: 'Saves',
-        v: 'Fort ' + hit(hd + 3) + ', Ref ' + hit(hd + 4) + ', Will ' + hit(hd + 1),
+        v: 'Fort ' + hit(lvl + 5) + ', Ref ' + hit(lvl + 6) + ', Will ' + hit(lvl + 4),
       },
       { k: 'Speed', v: mv + ' feet' },
       {
         k: 'Strikes',
-        v: A.map(
-          (a) => lo(a.n) + ' ' + hit(hd + 4) + ' (' + a.d + (a.note ? ' plus ' + a.note : '') + ')',
-        ).join('; '),
+        v: A.map((a) => {
+          const dice = /[+-]/.test(a.d) ? a.d : a.d + '+' + dmgBonus
+          return lo(a.n) + ' ' + hit(lvl + 7) + ' (' + dice + (a.note ? ' plus ' + a.note : '') + ')'
+        }).join('; '),
       },
     ]
   } else {
+    // Knave: attack bonus = HD; armor names from the Knave armor table.
+    const armName =
+      asc >= 16
+        ? 'plate'
+        : asc >= 15
+          ? 'half plate'
+          : asc >= 14
+            ? 'chain'
+            : asc >= 13
+              ? 'brigandine'
+              : asc >= 12
+                ? 'gambeson'
+                : 'no armor'
     badge = 'Knave'
     rows = [
-      { k: 'HD', v: String(hd) },
-      { k: 'AC', v: asc + ' (as ' + (asc >= 14 ? 'chain' : asc >= 12 ? 'leather' : 'no armor') + ')' },
-      { k: 'Atk', v: A.map((a) => lo(a.n) + ' (' + a.d + ')').join(', ') },
+      { k: 'HD', v: hd + ' (' + hp + ' hp)' },
+      { k: 'AC', v: asc + ' (as ' + armName + ')' },
+      {
+        k: 'Atk',
+        v: A.map(
+          (a) => lo(a.n) + ' ' + hit(hd) + ' (' + a.d + (a.note ? ', ' + a.note : '') + ')',
+        ).join(', '),
+      },
       { k: 'MV', v: mv + '′' },
       { k: 'ML', v: String(ml) },
       { k: 'AL', v: (m.al as string) || 'N' },

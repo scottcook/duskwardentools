@@ -18,7 +18,8 @@
   --deeper: #0d0a06;     /* pure inset */
   --bg: #0b0908;         /* page background */
   --text: #e6dcc6;       /* body text */
-  --danger: #a63c4e;     /* destructive accent */
+  --danger: #d45a6d;     /* destructive accent */
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='none' stroke='%239a8d72' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round' d='M1 1l4 4 4-4'/%3E%3C/svg%3E");
 }
 
 *,
@@ -33,9 +34,27 @@ body {
   padding: 0;
 }
 
+html {
+  min-height: 100%;
+  background-color: var(--bg);
+}
+
+/* Grunge texture — fixed, responsive cover, 25% opacity */
+html::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: url('/texture-bg.png') center / cover no-repeat;
+  opacity: 0.25;
+}
+
 body {
   min-height: 100vh;
-  background-color: var(--bg);
+  position: relative;
+  z-index: 1;
+  background-color: transparent;
   background-image:
     radial-gradient(ellipse 60% 45% at 12% 8%, rgba(212, 160, 23, 0.05), transparent 70%),
     radial-gradient(ellipse 50% 60% at 88% 92%, rgba(60, 40, 20, 0.35), transparent 70%),
@@ -114,12 +133,12 @@ button {
   margin: 10px 0 0;
   color: var(--dim);
   font-style: italic;
-  font-size: 15.5px;
+  font-size: 17px;
   max-width: 44ch;
 }
 .meta {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
+  font-size: 11.5px;
   letter-spacing: 2px;
   color: var(--dim);
   text-transform: uppercase;
@@ -144,7 +163,7 @@ button {
   padding: 9px 16px;
   color: var(--dim);
   font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
+  font-size: 12.5px;
   letter-spacing: 2px;
   text-transform: uppercase;
   cursor: pointer;
@@ -156,6 +175,11 @@ button {
 .navlink.on {
   color: var(--acc);
   border-bottom-color: var(--acc);
+}
+.nav-aux {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
 }
 
 /* ------------------------------------------------------------------------ */
@@ -183,14 +207,20 @@ button {
   letter-spacing: 1px;
 }
 .sel {
-  background: var(--deeper);
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: var(--deeper);
+  background-image: var(--select-chevron);
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 10px 6px;
   color: var(--text);
   border: 1px solid #000;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
+  font-size: 12.5px;
   letter-spacing: 1px;
   text-transform: uppercase;
-  padding: 6px 8px;
+  padding: 6px 40px 6px 10px;
   cursor: pointer;
   max-width: 46%;
 }
@@ -220,7 +250,7 @@ button {
   padding: 11px 8px;
   color: var(--dim);
   font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
+  font-size: 12.5px;
   letter-spacing: 2px;
   text-transform: uppercase;
   cursor: pointer;
@@ -253,11 +283,22 @@ button {
 }
 .hint {
   margin: 10px 0 0;
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--dim);
   font-family: 'JetBrains Mono', monospace;
   letter-spacing: 0.5px;
   line-height: 1.7;
+}
+.parse-hint {
+  color: var(--text);
+}
+.parse-warn {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+  color: var(--danger);
+  font-family: 'JetBrains Mono', monospace;
+  line-height: 1.6;
 }
 .fgrid {
   display: grid;
@@ -280,7 +321,7 @@ button {
 }
 .flbl {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 9.5px;
+  font-size: 11px;
   letter-spacing: 2px;
   text-transform: uppercase;
   color: var(--dim);
@@ -303,6 +344,14 @@ button {
   box-shadow: inset 0 0 0 1px rgba(212, 160, 23, 0.4);
 }
 select.in {
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: var(--deep);
+  background-image: var(--select-chevron);
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 10px 6px;
+  padding-right: 40px;
   cursor: pointer;
 }
 
@@ -347,10 +396,58 @@ select.in {
 }
 .th {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
+  font-size: 11.5px;
   color: var(--dim);
   letter-spacing: 1px;
   white-space: nowrap;
+}
+
+/* tome (bestiary) tab ----------------------------------------------------- */
+.tome-list {
+  max-height: 380px;
+  overflow-y: auto;
+  padding-right: 6px;
+  scrollbar-width: thin;                        /* Firefox */
+  scrollbar-color: var(--line-2) var(--deeper); /* Firefox */
+}
+.tome-list::-webkit-scrollbar {
+  width: 10px;
+}
+.tome-list::-webkit-scrollbar-track {
+  background: var(--deeper);
+  border: 1px solid var(--line);
+}
+.tome-list::-webkit-scrollbar-thumb {
+  background: var(--line-2);
+  border: 1px solid var(--line);
+}
+.tome-list::-webkit-scrollbar-thumb:hover {
+  background: #5a4d33;
+}
+.tome-list::-webkit-scrollbar-thumb:active {
+  background: var(--acc);
+}
+.tome-group {
+  margin: 6px 0 2px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10.5px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--acc);
+}
+.tome-group:first-child {
+  margin-top: 0;
+}
+.tome-error {
+  margin: 0 0 12px;
+  color: var(--danger);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+.trow:disabled {
+  cursor: wait;
+  opacity: 0.65;
 }
 
 /* transmute bar ---------------------------------------------------------- */
@@ -362,26 +459,30 @@ select.in {
   padding: 13px 16px;
   background: var(--deep);
 }
-.die {
-  width: 36px;
-  height: 36px;
-  transform: rotate(45deg);
-  border: 2px solid var(--acc);
+.diebox {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  flex: none;
+}
+.die-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.6));
+}
+.dienum {
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  flex: none;
-  background: var(--deeper);
-}
-.dienum {
-  transform: rotate(-45deg);
   font-family: 'JetBrains Mono', monospace;
   font-weight: 700;
-  font-size: 13px;
+  font-size: 12.5px;
   color: var(--acc);
-}
-.die.roll {
-  animation: spin 0.16s linear infinite;
+  pointer-events: none;
+  text-shadow: 0 1px 3px #000, 0 0 6px rgba(0, 0, 0, 0.8);
 }
 @keyframes spin {
   from {
@@ -429,7 +530,7 @@ select.in {
 .sysb {
   display: inline-block;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 9.5px;
+  font-size: 10.5px;
   letter-spacing: 2px;
   text-transform: uppercase;
   padding: 3px 8px;
@@ -517,7 +618,7 @@ select.in {
   border: 1px solid var(--line-2);
   color: var(--text);
   font-family: 'JetBrains Mono', monospace;
-  font-size: 10.5px;
+  font-size: 12px;
   letter-spacing: 2px;
   text-transform: uppercase;
   padding: 11px 8px;
@@ -544,43 +645,53 @@ select.in {
   border-top: 1px solid var(--line);
   padding-top: 14px;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 10.5px;
+  font-size: 12px;
   letter-spacing: 1px;
   color: var(--dim);
   text-transform: uppercase;
 }
+.foot-links {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.foot-link {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--dim);
+  transition: color 0.12s ease;
+}
+.foot-link:hover {
+  color: var(--acc);
+}
 
-/* ------------------------------------------------------------------------ */
-/* Grunge / grain textures                                                  */
-/* ------------------------------------------------------------------------ */
-.grain {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 60;
-  opacity: 0.09;
-  mix-blend-mode: overlay;
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+/* feedback modal states --------------------------------------------------- */
+.feedback-error {
+  margin: 0;
+  color: var(--danger);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  letter-spacing: 1px;
 }
-.scratch {
-  position: fixed;
-  inset: -45%;
-  pointer-events: none;
-  z-index: 59;
-  opacity: 0.045;
-  mix-blend-mode: screen;
-  transform: rotate(-14deg);
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='700' height='700'%3E%3Cfilter id='s'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.003 0.16' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 9 0 0 0 -4.2'/%3E%3C/filter%3E%3Crect width='700' height='700' filter='url(%23s)'/%3E%3C/svg%3E");
+.feedback-thanks {
+  text-align: center;
+  padding: 10px 6px 4px;
 }
-.scratch2 {
-  position: fixed;
-  inset: -45%;
-  pointer-events: none;
-  z-index: 59;
-  opacity: 0.03;
-  mix-blend-mode: screen;
-  transform: rotate(22deg);
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='600'%3E%3Cfilter id='s'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.13 0.002' numOctaves='2' seed='7'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 10 0 0 0 -4.6'/%3E%3C/filter%3E%3Crect width='600' height='600' filter='url(%23s)'/%3E%3C/svg%3E");
+.feedback-thanks .empty-mark {
+  color: var(--acc);
+}
+.feedback-thanks-title {
+  font-size: 26px;
+  margin: 0 0 8px;
 }
 
 /* ======================================================================== */
@@ -609,7 +720,7 @@ select.in {
   margin: 8px 0 0;
   color: var(--dim);
   font-style: italic;
-  font-size: 15px;
+  font-size: 16.5px;
 }
 .pagehead-actions {
   display: flex;
@@ -636,7 +747,7 @@ select.in {
   background: none;
   color: var(--text);
   font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 2px;
   text-transform: uppercase;
   padding: 10px 16px;
@@ -668,7 +779,7 @@ select.in {
 }
 .btn-sm {
   padding: 7px 11px;
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 1.5px;
 }
 .btn-icon {
@@ -735,7 +846,7 @@ select.in {
   border-top: 1px solid var(--line);
   background: var(--deep);
   font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
+  font-size: 11.5px;
   letter-spacing: 1.5px;
   text-transform: uppercase;
   color: var(--dim);
@@ -749,7 +860,7 @@ select.in {
   border: 1px solid var(--line-2);
   padding: 3px 8px;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
+  font-size: 11.5px;
   letter-spacing: 1px;
   color: var(--dim);
 }
@@ -794,14 +905,20 @@ select.in {
   box-shadow: inset 0 0 0 1px rgba(212, 160, 23, 0.35);
 }
 .filter-sel {
-  background: var(--deep);
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: var(--deep);
+  background-image: var(--select-chevron);
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 10px 6px;
   color: var(--text);
   border: 1px solid var(--line);
   font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
+  font-size: 12.5px;
   letter-spacing: 1px;
   text-transform: uppercase;
-  padding: 0 12px;
+  padding: 11px 40px 11px 12px;
   cursor: pointer;
   min-width: 150px;
 }
@@ -850,7 +967,7 @@ select.in {
 }
 .stat-chip {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
+  font-size: 11.5px;
   letter-spacing: 0.5px;
   color: var(--dim);
   border: 1px solid var(--line);
@@ -875,7 +992,7 @@ select.in {
 /* kind badge ------------------------------------------------------------- */
 .kind {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 9px;
+  font-size: 10.5px;
   letter-spacing: 1.5px;
   text-transform: uppercase;
   color: var(--acc);
@@ -999,7 +1116,7 @@ select.in {
   margin: 0 auto 18px;
   max-width: 46ch;
   font-style: italic;
-  font-size: 15px;
+  font-size: 16.5px;
   line-height: 1.5;
 }
 .spinner-wrap {
@@ -1010,7 +1127,7 @@ select.in {
   padding: 60px 20px;
   color: var(--dim);
   font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
+  font-size: 12.5px;
   letter-spacing: 2px;
   text-transform: uppercase;
 }
@@ -1083,7 +1200,7 @@ select.in {
   border: 1px solid rgba(212, 160, 23, 0.3);
   color: var(--acc);
   font-family: 'JetBrains Mono', monospace;
-  font-size: 10.5px;
+  font-size: 11.5px;
   letter-spacing: 1px;
   text-transform: uppercase;
   padding: 8px 14px;
@@ -1156,7 +1273,7 @@ select.in {
 }
 .tag-chip {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 9.5px;
+  font-size: 10.5px;
   letter-spacing: 1px;
   text-transform: uppercase;
   color: var(--dim);
