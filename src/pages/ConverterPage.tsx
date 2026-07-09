@@ -15,6 +15,7 @@ import {
 import { api } from '../lib/api'
 import { useToast } from '../components/ToastProvider'
 import { D20Die } from '../components/D20Die'
+import { ScribeScan } from '../components/ScribeScan'
 import { parseStatBlock, systemLabelForParse } from '../lib/parseStatBlock'
 
 type Tab = 'scribe' | 'forge' | 'tome'
@@ -291,6 +292,14 @@ export function ConverterPage() {
 
           {tab === 'scribe' && (
             <div className="pbody">
+              <ScribeScan
+                hasExistingText={scribe.trim().length > 0}
+                onAccept={(text) => {
+                  srcOverridden.current = false
+                  setScribe(text)
+                  notify('Stat block inscribed from scan')
+                }}
+              />
               <textarea
                 className="ta"
                 value={scribe}
