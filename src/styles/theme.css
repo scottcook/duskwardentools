@@ -8,16 +8,16 @@
 
 :root {
   --acc: #d4a017;        /* gold accent */
-  --acc-2: #e6dcc6;      /* parchment highlight */
+  --acc-2: #faf7f0;      /* near-white parchment highlight */
   --ink: #17130c;        /* near-black ink (on parchment) */
   --line: #2c261c;       /* hairline borders */
   --line-2: #3a3226;     /* stronger borders / double rules */
-  --dim: #CFBF9F;        /* muted text */
+  --dim: #f0ebe0;        /* muted near-white text */
   --pan: #13100c;        /* panel background */
   --deep: #0d0a07;       /* deep inset background */
   --deeper: #0d0a06;     /* pure inset */
   --bg: #0b0908;         /* page background */
-  --text: #e6dcc6;       /* body text */
+  --text: #faf7f0;       /* near-white body text */
   --danger: #d45a6d;     /* destructive accent */
   --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='none' stroke='%239a8d72' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round' d='M1 1l4 4 4-4'/%3E%3C/svg%3E");
 }
@@ -343,9 +343,9 @@ main {
   min-height: 266px;
   background: var(--deep);
   border: 1px solid var(--line);
-  color: #cfc3a6;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 12.5px;
+  color: var(--text);
+  font-family: 'JetBrains Mono', ui-sans-serif, monospace;
+  font-size: 13px;
   line-height: 1.6;
   padding: 12px;
   resize: vertical;
@@ -662,8 +662,8 @@ main {
   background: var(--deep);
   border: 1px solid var(--line);
   color: var(--text);
-  font-family: 'Alegreya', serif;
-  font-size: 15px;
+  font-family: 'JetBrains Mono', ui-sans-serif, monospace;
+  font-size: 14px;
   padding: 8px 10px;
   box-sizing: border-box;
   width: 100%;
@@ -867,49 +867,50 @@ select.in {
 .sysb {
   display: inline-block;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 10.5px;
+  font-size: 12px;
   letter-spacing: 2px;
   text-transform: uppercase;
-  padding: 3px 8px;
+  padding: 4px 9px;
   border: 1px solid currentColor;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
   opacity: 0.75;
 }
 .mname {
   margin: 0;
-  font-size: 38px;
-  line-height: 0.9;
+  font-size: 46px;
+  line-height: 0.95;
   font-family: 'Pirata One', serif;
   font-weight: 400;
 }
 .mep {
   font-style: italic;
   opacity: 0.7;
-  margin: 5px 0 0;
-  font-size: 15px;
+  margin: 6px 0 0;
+  font-size: 17px;
+  line-height: 1.35;
 }
 .hrh {
   height: 3px;
   background: currentColor;
-  margin: 13px 0 4px;
+  margin: 14px 0 4px;
 }
 .hrt {
   height: 1px;
   background: currentColor;
   opacity: 0.45;
-  margin: 4px 0 10px;
+  margin: 4px 0 12px;
 }
 .srow {
-  padding: 2px 0;
-  font-size: 15.5px;
-  line-height: 1.45;
+  padding: 3px 0;
+  font-size: 18px;
+  line-height: 1.5;
   margin: 0;
 }
 .sect {
   margin: 0;
-  padding: 3px 0;
-  font-size: 15px;
-  line-height: 1.5;
+  padding: 4px 0;
+  font-size: 17px;
+  line-height: 1.55;
 }
 .bi {
   font-style: italic;
@@ -1232,8 +1233,8 @@ select.in {
   background: var(--deep);
   border: 1px solid var(--line);
   color: var(--text);
-  font-family: 'Alegreya', serif;
-  font-size: 16px;
+  font-family: 'JetBrains Mono', ui-sans-serif, monospace;
+  font-size: 14px;
   padding: 11px 12px 11px 34px;
 }
 .search-in:focus {
@@ -1933,16 +1934,34 @@ select.in {
   }
 
   .sheet {
-    padding: 18px 16px 16px;
+    padding: 18px 14px 16px;
+  }
+
+  .sysb {
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    margin-bottom: 12px;
   }
 
   .mname {
-    font-size: 30px;
+    font-size: clamp(28px, 8.5vw, 38px);
+    line-height: 1;
     overflow-wrap: anywhere;
   }
 
-  .srow,
+  .mep {
+    font-size: 16px;
+  }
+
+  .srow {
+    font-size: 16px;
+    line-height: 1.55;
+    overflow-wrap: anywhere;
+  }
+
   .sect {
+    font-size: 16px;
+    line-height: 1.55;
     overflow-wrap: anywhere;
   }
 

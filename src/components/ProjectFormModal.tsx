@@ -76,7 +76,7 @@ export function ProjectFormModal({
           <textarea
             id="pf-desc"
             className="ta"
-            style={{ minHeight: 110, fontFamily: "'Alegreya', serif", fontSize: 15 }}
+            style={{ minHeight: 110 }}
             value={description}
             maxLength={2000}
             placeholder="A drowned necropolis beneath the fens…"
