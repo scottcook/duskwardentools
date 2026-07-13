@@ -64,6 +64,10 @@ export interface ParsedCreature {
   source?: CreatureSource
   /** Forge fields that were actually present in the source, before fallbacks. */
   sourceFields?: string[]
+  sourceProfile?: Record<string, unknown>
+  hitDice?: string
+  role?: string
+  targetOverrides?: Record<string, unknown>
   [key: string]: unknown
 }
 

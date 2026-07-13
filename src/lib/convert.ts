@@ -2,24 +2,67 @@
  * Monster transmutation — renders the neutral "forge" model into a target
  * system's stat block.
  *
- * Each system section below follows that game's published math as closely as
- * a heuristic converter can:
- *  - OSE/B/X:   monster attack matrix (THAC0), fighter-equivalent saves,
- *               XP-by-HD award table, 19 − AC descending conversion.
- *  - AD&D 1E:   20 − AC descending conversion (1E unarmored = AC 10),
- *               Monster Manual field order.
- *  - D&D 5E:    HP = HD×d8 average + CON mod × HD (dice expression matches
- *               the total), attack = proficiency + best ability mod,
- *               CR/XP ladder by HD.
- *  - Shadowdark: level = HD, attack bonus = level, stats derived from
- *               HD/speed/kind.
- *  - DCC:       Init from speed, saves ≈ half HD, SP line, Action Die.
- *  - Mörk Borg: player-facing (no attack bonus), armor as damage reduction
- *               dice, no alignment.
- *  - PF2E:      GM Core creature-building benchmarks (moderate road) keyed
- *               to level = HD − 1.
- *  - Knave:     attack bonus = HD, Knave armor tier names.
+ * Source values are preserved in `sourceProfile`. Cross-system values use
+ * published target-system tables where those exist. Systems without a
+ * canonical conversion formula expose explicit overrides and conservative
+ * runnable defaults instead of presenting invented arithmetic as source truth.
  */
+import {
+  FIVE_E_CR,
+  averageDamage,
+  averageHitPoints,
+  dccCombatStats,
+  estimateFiveECr,
+  fiveEProficiency,
+  formatDccSaves,
+  knaveHitPoints,
+  morkBorgDamage,
+  oseAttack,
+  oseExperience,
+  oseMovement,
+  oseSaves,
+  parseHitDice,
+  pf2eBenchmarks,
+  shadowdarkHitPoints,
+  type MonsterRole,
+} from './systemRules'
+
+export interface TargetOverrides {
+  hp?: string
+  ac?: string
+  level?: string
+  attackBonus?: string
+  stats?: string
+  saves?: string
+  initiative?: string
+  actionDice?: string
+  crit?: string
+}
+
+/** Exact values captured from the source before neutral conversion. */
+export interface ForgeSourceProfile {
+  system?: string
+  hp?: number
+  hitDice?: string
+  level?: number
+  challenge?: string
+  size?: string
+  movement?: string
+  attackBonus?: number
+  initiative?: number
+  actionDice?: string
+  crit?: string
+  perception?: number
+  frequency?: string
+  numberAppearing?: string
+  lairChance?: string
+  treasureType?: string
+  magicResistance?: string
+  intelligence?: string
+  psionics?: string
+  thac0?: number
+  xp?: number
+}
 
 export interface ForgeMonster {
   name: string
@@ -37,6 +80,9 @@ export interface ForgeMonster {
   /** Explicit target-system values supplied after reviewing a warning. */
   statsOverride?: string
   savesOverride?: string
+  role?: MonsterRole
+  sourceProfile?: ForgeSourceProfile
+  targetOverrides?: Record<string, TargetOverrides>
   atkText: string
   traitsText: string
 }
@@ -157,38 +203,29 @@ const AL_LABEL: Record<string, string> = { L: 'Lawful', N: 'Neutral', C: 'Chaoti
 const hit = (n: number) => (n >= 0 ? '+' : '−') + Math.abs(n)
 const lo = (s: string) => String(s).toLowerCase()
 
-/** B/X / OSE monster attack matrix: HD → [THAC0, attack bonus]. */
-function oseThac0(hd: number): [number, number] {
-  if (hd <= 7) return [20 - hd, hd - 1] // HD 1 → 19 [0], HD 2 → 18 [+1] …
-  if (hd <= 9) return [12, 7]
-  if (hd <= 11) return [11, 8]
-  if (hd <= 13) return [10, 9]
-  return [9, 10]
-}
-
-/** OSE XP awards by HD (base values, no special-ability bonus). */
-const OSE_XP: Record<number, number> = {
-  1: 10, 2: 20, 3: 35, 4: 75, 5: 175, 6: 275, 7: 450, 8: 650,
-  9: 900, 10: 900, 11: 1100, 12: 1100,
-}
-
-/** 5E CR ladder by HD with the PHB XP value for each rating. */
-const CR_BY_HD: string[] = [
-  '1/4 (50 XP)', // HD 1
-  '1 (200 XP)', // HD 2
-  '2 (450 XP)', // HD 3
-  '3 (700 XP)', // HD 4
-  '4 (1,100 XP)', // HD 5
-  '5 (1,800 XP)', // HD 6
-  '6 (2,300 XP)', // HD 7
-  '7 (2,900 XP)', // HD 8
-  '8 (3,900 XP)', // HD 9
-  '9 (5,000 XP)', // HD 10
-  '10 (5,900 XP)', // HD 11
-  '11 (7,200 XP)', // HD 12
-]
-
 const mod = (score: number) => Math.floor((score - 10) / 2)
+
+function finiteNumber(value: unknown): number | undefined {
+  if (value === undefined || value === null || String(value).trim() === '') return undefined
+  const number = Number(String(value).replace('−', '-'))
+  return Number.isFinite(number) ? number : undefined
+}
+
+function addDamageModifier(expression: string, modifier: number): string {
+  if (!modifier || /[+-]\d+\s*$/.test(expression)) return expression
+  return `${expression}${modifier > 0 ? '+' : ''}${modifier}`
+}
+
+function damageRoutine(attacks: ParsedAttack[], modifier = 0): number {
+  return attacks.reduce((total, attack) => {
+    const { count } = atkParts(attack.n)
+    return total + count * Math.max(0, averageDamage(addDamageModifier(attack.d, modifier)))
+  }, 0)
+}
+
+function shadowdarkModifier(stats: string, label: string, fallback: number): number {
+  return abilityValue(stats, label) ?? fallback
+}
 
 function signed(value: number): string {
   return value >= 0 ? `+${value}` : `−${Math.abs(value)}`
@@ -260,75 +297,137 @@ function atkParts(n: string): { count: number; name: string } {
 
 /** Render a forge monster into a target system's stat block. */
 export function format(sys: string, m: ForgeMonster, sourceSystem = ''): FormattedBlock {
-  const hd = Math.max(1, +m.hd || 1)
+  const sourceProfile = m.sourceProfile ?? {}
+  const hdProfile = parseHitDice(sourceProfile.hitDice || m.hd, 1)
+  const hd = Math.max(1, Math.ceil(hdProfile.count))
   const asc = +m.ac || 10
   const mv = +m.speed || 30
   const ml = +m.ml || 8
-  const hp = Math.max(1, Math.round(hd * 4.5)) // HD × d8 average
-  const dscBX = 19 - asc // B/X: unarmored = AC 9 [10]
-  const dsc1e = 20 - asc // AD&D: unarmored = AC 10
   const A = parseAttacks(m.atkText)
   const T = parseTraits(m.traitsText)
   const AL = AL_LABEL[m.al as string] || 'Neutral'
   const kind = lo(m.kind || '')
+  const role = m.role ?? 'balanced'
+  const sameSystem = sourceSystem === sys
+  const overrides = m.targetOverrides?.[sys] ?? {}
+  const targetAc = finiteNumber(overrides.ac) ?? asc
+  const exactHp = sameSystem ? sourceProfile.hp : undefined
   const sourceStats =
-    String(m.statsOverride || '').trim() || statsForTarget(sourceSystem, sys, m.stats)
+    String(overrides.stats || m.statsOverride || '').trim() ||
+    statsForTarget(sourceSystem, sys, m.stats)
   const sourceSaves =
-    String(m.savesOverride || '').trim() ||
+    String(overrides.saves || m.savesOverride || '').trim() ||
     (sourceSystem === sys ? String(m.saves || '').trim() : '')
   const beastly = /beast|animal|vermin|ooze/.test(kind)
-  const mindless = /undead|construct|plant/.test(kind)
+  const mindless = /mindless|ooze/.test(kind)
 
   let badge = ''
   let rows: StatRow[] = []
 
   if (sys === 'dnd5e') {
-    // Ability array: STR scales with HD, DEX fixed brute-average, CON funds
-    // bonus HP, INT/CHA follow creature kind.
-    const str = 10 + Math.min(hd, 8)
-    const dex = 14
-    const con = 10 + Math.min(hd, 6)
-    const int = beastly ? 3 : mindless ? 6 : /humanoid|fey|fiend/.test(kind) ? 10 : 7
-    const cha = beastly || mindless ? 6 : 10
-    const conBonus = mod(con) * hd
-    const hp5e = hp + conBonus
-    const prof = hd <= 4 ? 2 : hd <= 8 ? 3 : 4
-    const atk = prof + Math.max(mod(str), mod(dex))
-    badge = 'Dungeons & Dragons · Fifth Edition'
+    const str = abilityValue(sourceStats, 'STR') ?? 10 + Math.min(hd, 8)
+    const dex = abilityValue(sourceStats, 'DEX') ?? 12
+    const con = abilityValue(sourceStats, 'CON') ?? 10 + Math.min(hd, 6)
+    const int =
+      abilityValue(sourceStats, 'INT') ??
+      (beastly ? 3 : mindless ? 1 : /humanoid|fey|fiend/.test(kind) ? 10 : 7)
+    const wis = abilityValue(sourceStats, 'WIS') ?? 10
+    const cha = abilityValue(sourceStats, 'CHA') ?? (beastly || mindless ? 6 : 10)
+    const abilityAttack = Math.max(mod(str), mod(dex))
+    const conBonus = mod(con) * Math.ceil(hdProfile.count)
+    const calculatedHp = averageHitPoints({
+      ...hdProfile,
+      die: sameSystem ? hdProfile.die : 8,
+      modifier: sameSystem ? hdProfile.modifier : conBonus,
+    })
+    const hp5e = Math.max(1, finiteNumber(overrides.hp) ?? exactHp ?? calculatedHp)
+
+    let challenge = sameSystem && sourceProfile.challenge
+      ? sourceProfile.challenge
+      : undefined
+    let proficiency = fiveEProficiency(challenge ?? 0)
+    let attackBonus =
+      finiteNumber(overrides.attackBonus) ??
+      (sameSystem ? sourceProfile.attackBonus : undefined) ??
+      proficiency + abilityAttack
+    const damageModifier = Math.max(mod(str), mod(dex))
+    let damagePerRound = damageRoutine(A, damageModifier)
+    let challengeRow = estimateFiveECr(hp5e, targetAc, damagePerRound, attackBonus)
+
+    if (!challenge) {
+      proficiency = challengeRow.proficiency
+      attackBonus = finiteNumber(overrides.attackBonus) ?? proficiency + abilityAttack
+      damagePerRound = damageRoutine(A, damageModifier)
+      challengeRow = estimateFiveECr(hp5e, targetAc, damagePerRound, attackBonus)
+      challenge = challengeRow.cr
+    } else {
+      challengeRow = {
+        ...challengeRow,
+        cr: challenge,
+        xp: FIVE_E_CR.find((row) => row.cr === challenge)?.xp ?? challengeRow.xp,
+      }
+    }
+
+    const totalAttacks = A.reduce((sum, attack) => sum + atkParts(attack.n).count, 0)
+    const actionDetails = A.map((attack) => {
+      const part = atkParts(attack.n)
+      const damage = addDamageModifier(attack.d, damageModifier)
+      return `${part.name} ${hit(attackBonus)} to hit (${damage}${attack.note ? `; ${attack.note}` : ''})`
+    })
+    const actions =
+      totalAttacks > 1
+        ? `Multiattack. Makes ${totalAttacks} attacks: ${A.map((attack) => {
+            const part = atkParts(attack.n)
+            return `${part.count} ${part.name}`
+          }).join(' and ')}. ${actionDetails.join('; ')}`
+        : actionDetails.join('; ')
+    const hitDiceText =
+      sameSystem && sourceProfile.hitDice
+        ? sourceProfile.hitDice
+        : `${Math.ceil(hdProfile.count)}d8${conBonus > 0 ? `+${conBonus}` : conBonus < 0 ? conBonus : ''}`
+
+    badge = 'Dungeons & Dragons · Fifth Edition (2014)'
     rows = [
-      { k: 'Armor Class', v: String(asc) },
-      {
-        k: 'Hit Points',
-        v: hp5e + ' (' + hd + 'd8' + (conBonus > 0 ? '+' + conBonus : '') + ')',
-      },
+      { k: 'Armor Class', v: String(targetAc) },
+      { k: 'Hit Points', v: `${hp5e} (${hitDiceText})` },
       { k: 'Speed', v: mv + ' ft.' },
       {
         k: 'Abilities',
-        v: sourceStats || `STR ${str}, DEX ${dex}, CON ${con}, INT ${int}, WIS 10, CHA ${cha}`,
+        v: `STR ${str}, DEX ${dex}, CON ${con}, INT ${int}, WIS ${wis}, CHA ${cha}`,
       },
+      { k: 'Actions', v: actions },
       {
-        k: 'Actions',
-        v: A.map(
-          (a) => a.n + ' ' + hit(atk) + ' to hit (' + a.d + (a.note ? ', ' + a.note : '') + ')',
-        ).join(' or '),
+        k: 'Challenge',
+        v: `${challenge} (${challengeRow.xp.toLocaleString()} XP)${
+          sameSystem && sourceProfile.challenge ? '' : ' · estimated by 2014 DMG combat benchmarks'
+        }`,
       },
-      { k: 'Challenge', v: CR_BY_HD[Math.min(hd, 12) - 1] },
     ]
   } else if (sys === 'ose') {
-    // Monsters save as fighters of level = HD (OSE monster save table).
-    const sv =
-      hd <= 3
-        ? 'D12 W13 P14 B15 S16'
-        : hd <= 6
-          ? 'D10 W11 P12 B13 S14'
-          : hd <= 9
-            ? 'D8 W9 P10 B10 S12'
-            : 'D6 W7 P8 B8 S10'
-    const [thac0, ab] = oseThac0(hd)
+    const profileForXp = {
+      ...hdProfile,
+      specialAbilities:
+        hdProfile.specialAbilities || (sameSystem ? 0 : T.length),
+    }
+    const targetHp =
+      finiteNumber(overrides.hp) ??
+      exactHp ??
+      averageHitPoints({ ...hdProfile, die: 8 })
+    const attack = sameSystem && sourceProfile.thac0 !== undefined
+      ? { thac0: sourceProfile.thac0, bonus: 19 - sourceProfile.thac0 }
+      : oseAttack(hdProfile.count, hdProfile.modifier > 0)
+    const movement =
+      sameSystem && sourceProfile.movement
+        ? sourceProfile.movement
+        : oseMovement(mv)
+    const xp =
+      sameSystem && sourceProfile.xp !== undefined
+        ? sourceProfile.xp
+        : oseExperience(profileForXp)
     badge = 'Old-School Essentials · B/X'
     rows = [
-      { k: 'AC', v: dscBX + ' [' + asc + ']' },
-      { k: 'HD', v: hd + ' (' + hp + ' hp)' },
+      { k: 'AC', v: `${19 - targetAc} [${targetAc}]` },
+      { k: 'HD', v: `${hdProfile.notation} (${targetHp} hp)` },
       {
         k: 'Att',
         v: A.map((a) => {
@@ -336,53 +435,97 @@ export function format(sys: string, m: ForgeMonster, sourceSystem = ''): Formatt
           return p.count + ' × ' + p.name + ' (' + a.d + (a.note ? ' + ' + a.note : '') + ')'
         }).join(', '),
       },
-      { k: 'THAC0', v: thac0 + ' [' + hit(ab) + ']' },
-      { k: 'MV', v: mv * 4 + '′ (' + Math.round((mv * 4) / 30) * 10 + '′)' },
-      { k: 'SV', v: sourceSaves || sv },
+      { k: 'THAC0', v: `${attack.thac0} [${hit(attack.bonus)}]` },
+      { k: 'MV', v: movement },
+      { k: 'SV', v: sourceSaves || oseSaves(hdProfile.count) },
       { k: 'ML', v: String(ml) },
       { k: 'AL', v: AL },
-      { k: 'XP', v: String(OSE_XP[Math.min(hd, 12)] || 1100) },
+      { k: 'XP', v: String(xp) },
     ]
   } else if (sys === 'add1') {
     const natt = A.reduce((n, a) => n + atkParts(a.n).count, 0)
-    const intel = beastly ? 'Animal' : mindless ? 'Low' : 'Average'
+    const defensiveTraits = T.filter((trait) =>
+      /armor|armour|hide|immune|resist|regener|defen|invisible|incorporeal/i.test(
+        `${trait.h} ${trait.d}`,
+      ),
+    )
+    const offensiveTraits = T.filter((trait) => !defensiveTraits.includes(trait))
+    const intel =
+      sourceProfile.intelligence ??
+      (beastly ? 'Animal' : mindless ? 'Non-' : 'Average')
+    const movement =
+      sameSystem && sourceProfile.movement
+        ? sourceProfile.movement
+        : `${Math.max(1, Math.round((mv * 2) / 5))}″`
     badge = 'Advanced D&D · First Edition'
     rows = [
-      { k: 'Frequency', v: 'Uncommon' },
-      { k: 'No. Appearing', v: '2–8' },
-      { k: 'Armor Class', v: String(dsc1e) },
-      { k: 'Move', v: Math.round((mv * 2) / 5) + '″' },
-      { k: 'Hit Dice', v: String(hd) },
-      { k: '% in Lair', v: '25%' },
-      { k: 'Treasure Type', v: 'Nil' },
+      { k: 'Frequency', v: sourceProfile.frequency ?? 'Referee’s choice' },
+      { k: 'No. Appearing', v: sourceProfile.numberAppearing ?? 'Referee’s choice' },
+      { k: 'Armor Class', v: String(20 - targetAc) },
+      { k: 'Move', v: movement },
+      { k: 'Hit Dice', v: hdProfile.notation },
+      { k: '% in Lair', v: sourceProfile.lairChance ?? 'Referee’s choice' },
+      { k: 'Treasure Type', v: sourceProfile.treasureType ?? 'Referee’s choice' },
       { k: 'No. of Attacks', v: String(natt) },
       { k: 'Damage/Attack', v: A.map((a) => a.d).join(' / ') },
-      { k: 'Special Attacks', v: T[0] ? T[0].h : 'Nil' },
-      { k: 'Special Defenses', v: T[1] ? T[1].h : 'Nil' },
-      { k: 'Magic Resistance', v: 'Standard' },
+      {
+        k: 'Special Attacks',
+        v: offensiveTraits.length ? offensiveTraits.map((trait) => trait.h).join(', ') : 'Nil',
+      },
+      {
+        k: 'Special Defenses',
+        v: defensiveTraits.length ? defensiveTraits.map((trait) => trait.h).join(', ') : 'Nil',
+      },
+      { k: 'Magic Resistance', v: sourceProfile.magicResistance ?? 'Standard' },
       { k: 'Intelligence', v: intel },
       { k: 'Alignment', v: AL },
-      { k: 'Size', v: 'M' },
+      { k: 'Size', v: sourceProfile.size ?? 'M' },
+      { k: 'Psionic Ability', v: sourceProfile.psionics ?? 'Nil' },
+      { k: 'Attack / Saves', v: `Use monster matrices at ${Math.ceil(hdProfile.count)} HD` },
+      {
+        k: 'Level / X.P. Value',
+        v:
+          sourceProfile.xp !== undefined
+            ? sourceProfile.xp.toLocaleString()
+            : 'Calculate from actual HP and special abilities',
+      },
     ]
   } else if (sys === 'shadowdark') {
-    // Level = HD; attack bonus = level; stats derived from HD, speed, kind.
-    const s = Math.min(hd, 4)
+    const level =
+      finiteNumber(overrides.level) ??
+      (sameSystem ? sourceProfile.level : undefined) ??
+      hd
+    const s = Math.min(level, 4)
     const d = mv >= 40 ? 3 : mv >= 30 ? 2 : mv >= 20 ? 0 : -1
     const i = beastly ? -3 : mindless ? -2 : 0
     const ch = beastly || mindless ? -2 : 0
+    const stats =
+      sourceStats || `S ${hit(s)}, D ${hit(d)}, C +0, I ${hit(i)}, W +0, Ch ${hit(ch)}`
+    const con = shadowdarkModifier(stats, 'C', 0)
+    const strength = shadowdarkModifier(stats, 'S', s)
+    const dexterity = shadowdarkModifier(stats, 'D', d)
+    const targetHp =
+      finiteNumber(overrides.hp) ??
+      exactHp ??
+      shadowdarkHitPoints(level, con)
+    const globalAttack =
+      finiteNumber(overrides.attackBonus) ??
+      (sameSystem ? sourceProfile.attackBonus : undefined)
     badge = 'Shadowdark RPG'
     rows = [
-      { k: 'AC', v: String(asc) },
-      { k: 'HP', v: String(hp) },
+      { k: 'AC', v: String(targetAc) },
+      { k: 'HP', v: String(targetHp) },
       {
         k: 'ATK',
         v: A.map((a) => {
           const p = atkParts(a.n)
+          const ranged = /bow|sling|shot|spit|ray|ranged|javelin/i.test(a.n)
+          const attack = globalAttack ?? Math.min(level, ranged ? dexterity : strength)
           return (
             (p.count > 1 ? p.count + ' ' : '') +
             p.name +
             ' ' +
-            hit(hd) +
+            hit(attack) +
             ' (' +
             a.d +
             (a.note ? ' + ' + a.note : '') +
@@ -390,16 +533,47 @@ export function format(sys: string, m: ForgeMonster, sourceSystem = ''): Formatt
           )
         }).join(' and '),
       },
-      { k: 'MV', v: mv >= 40 ? 'double near' : mv <= 15 ? 'close' : 'near' },
       {
-        k: 'Stats',
-        v: sourceStats || `S ${hit(s)}, D ${hit(d)}, C +0, I ${hit(i)}, W +0, Ch ${hit(ch)}`,
+        k: 'MV',
+        v:
+          sameSystem && sourceProfile.movement
+            ? sourceProfile.movement
+            : mv >= 50
+              ? 'double near'
+              : mv <= 15
+                ? 'close'
+                : 'near',
       },
+      { k: 'Stats', v: stats },
       { k: 'AL', v: (m.al as string) || 'N' },
-      { k: 'LV', v: String(hd) },
+      { k: 'LV', v: String(level) },
     ]
   } else if (sys === 'dcc') {
-    const init = mv >= 40 ? 2 : mv <= 15 ? -1 : 1
+    const totalAttacks = A.reduce((sum, attack) => sum + atkParts(attack.n).count, 0)
+    const derived = dccCombatStats(hdProfile.count, totalAttacks, kind, role)
+    const init =
+      finiteNumber(overrides.initiative) ??
+      (sameSystem ? sourceProfile.initiative : undefined) ??
+      derived.initiative
+    const attackBonus =
+      finiteNumber(overrides.attackBonus) ??
+      (sameSystem ? sourceProfile.attackBonus : undefined) ??
+      derived.attackBonus
+    const actionDice =
+      overrides.actionDice ||
+      (sameSystem ? sourceProfile.actionDice : undefined) ||
+      derived.actionDice
+    const crit =
+      overrides.crit ||
+      (sameSystem ? sourceProfile.crit : undefined) ||
+      derived.crit
+    const targetHp =
+      finiteNumber(overrides.hp) ??
+      exactHp ??
+      averageHitPoints(hdProfile)
+    const savesLine =
+      sourceSaves ||
+      formatDccSaves(derived.fortitude, derived.reflex, derived.will)
     badge = 'Dungeon Crawl Classics'
     rows = [
       { k: 'Init', v: hit(init) },
@@ -407,103 +581,125 @@ export function format(sys: string, m: ForgeMonster, sourceSystem = ''): Formatt
         k: 'Atk',
         v: A.map(
           (a) =>
-            lo(a.n) + ' ' + hit(hd) + ' melee (' + a.d + (a.note ? ' plus ' + a.note : '') + ')',
+            lo(a.n) +
+            ' ' +
+            hit(attackBonus) +
+            (/bow|sling|shot|spit|ray|ranged|javelin/i.test(a.n) ? ' missile fire' : ' melee') +
+            ' (' +
+            a.d +
+            (a.note ? ' plus ' + a.note : '') +
+            ')',
         ).join(' or '),
       },
-      { k: 'AC', v: String(asc) },
-      { k: 'HD', v: hd + 'd8 (' + hp + ' hp)' },
+      { k: 'Crit', v: crit },
+      { k: 'AC', v: String(targetAc) },
+      { k: 'HD', v: `${hdProfile.notation.includes('d') ? hdProfile.notation : `${hd}d8`} (${targetHp} hp)` },
       { k: 'MV', v: mv + '′' },
-      { k: 'Act', v: '1d20' },
-      { k: 'SP', v: T.length ? T.map((t) => lo(t.h)).join(', ') : 'none' },
+      { k: 'Act', v: actionDice },
       {
-        k: 'SV',
-        v: sourceSaves ||
-          'Fort ' +
-          hit(Math.ceil(hd / 2)) +
-          ', Ref ' +
-          hit(Math.ceil(hd / 2)) +
-          ', Will ' +
-          hit(Math.floor(hd / 2)),
+        k: 'SP',
+        v: T.length ? T.map((trait) => `${lo(trait.h)}${trait.d ? ` (${trait.d})` : ''}`).join('; ') : 'none',
       },
+      { k: 'SV', v: savesLine },
       { k: 'AL', v: (m.al as string) || 'N' },
     ]
   } else if (sys === 'morkborg') {
-    // Player-facing: no attack bonus, no alignment; armor is a DR die.
     const arm =
-      asc >= 16
+      targetAc >= 16
         ? '−d6 (heavy plate)'
-        : asc >= 14
+        : targetAc >= 14
           ? '−d4 (heavy hide)'
-          : asc >= 12
+          : targetAc >= 12
             ? '−d2 (scraps)'
             : 'none'
+    const targetHp =
+      finiteNumber(overrides.hp) ??
+      exactHp ??
+      Math.max(4, Math.round(hdProfile.count * 4))
     badge = 'Mörk Borg'
     rows = [
-      { k: 'HP', v: String(Math.max(4, hd * 4)) },
+      { k: 'HP', v: String(targetHp) },
       { k: 'Morale', v: String(ml) },
       { k: 'Armor', v: arm },
       {
         k: 'Attack',
-        v: A.map(
-          (a) =>
-            atkParts(a.n).name.replace(/^\d+\s*/, '') +
-            ' d' +
-            a.d.split('d')[1] +
-            (a.note ? ' (' + a.note + ')' : ''),
-        ).join(' or '),
+        v: A.map((a) => {
+          const part = atkParts(a.n)
+          return `${part.count > 1 ? `${part.count}× ` : ''}${part.name} ${morkBorgDamage(a.d)}${
+            a.note ? ` (${a.note})` : ''
+          }`
+        }).join(' or '),
       },
     ]
   } else if (sys === 'pf2e') {
-    // GM Core creature-building benchmarks, moderate road, level = HD − 1.
-    const lvl = hd - 1
-    const ac2e = Math.floor(15 + lvl * 1.5)
-    const hp2e = lvl <= 0 ? 15 : 10 * lvl + 10
-    const dmgBonus = lvl + 2
+    const level =
+      finiteNumber(overrides.level) ??
+      (sameSystem ? sourceProfile.level : undefined) ??
+      hd - 1
+    const benchmark = pf2eBenchmarks(level, role)
+    const targetHp = finiteNumber(overrides.hp) ?? exactHp ?? benchmark.hp
+    const attackBonus =
+      finiteNumber(overrides.attackBonus) ??
+      (sameSystem ? sourceProfile.attackBonus : undefined) ??
+      benchmark.strike
     badge = 'Pathfinder · Second Edition'
     rows = [
-      { k: 'Level', v: 'Creature ' + lvl },
-      { k: 'Perception', v: hit(lvl + 6) },
-      { k: 'AC', v: String(ac2e) },
-      { k: 'HP', v: String(hp2e) },
+      { k: 'Level', v: `Creature ${benchmark.level}` },
+      {
+        k: 'Perception',
+        v: hit(
+          sameSystem && sourceProfile.perception !== undefined
+            ? sourceProfile.perception
+            : benchmark.perception,
+        ),
+      },
+      { k: 'AC', v: String(finiteNumber(overrides.ac) ?? (sameSystem ? asc : benchmark.ac)) },
+      { k: 'HP', v: String(targetHp) },
       {
         k: 'Saves',
         v:
           sourceSaves ||
-          'Fort ' + hit(lvl + 5) + ', Ref ' + hit(lvl + 6) + ', Will ' + hit(lvl + 4),
+          `Fort ${hit(benchmark.fortitude)}, Ref ${hit(benchmark.reflex)}, Will ${hit(benchmark.will)}`,
       },
       { k: 'Speed', v: mv + ' feet' },
       {
         k: 'Strikes',
-        v: A.map((a) => {
-          const dice = /[+-]/.test(a.d) ? a.d : a.d + '+' + dmgBonus
-          return lo(a.n) + ' ' + hit(lvl + 7) + ' (' + dice + (a.note ? ' plus ' + a.note : '') + ')'
-        }).join('; '),
+        v: A.map((a) =>
+          `${lo(a.n)} ${hit(attackBonus)} (${
+            sameSystem ? a.d : benchmark.damage
+          }${a.note ? ` plus ${a.note}` : ''})`,
+        ).join('; '),
       },
     ]
   } else {
-    // Knave: attack bonus = HD; armor names from the Knave armor table.
     const armName =
-      asc >= 16
-        ? 'plate'
-        : asc >= 15
+      targetAc >= 16
+        ? 'full plate'
+        : targetAc >= 15
           ? 'half plate'
-          : asc >= 14
+          : targetAc >= 14
             ? 'chain'
-            : asc >= 13
+            : targetAc >= 13
               ? 'brigandine'
-              : asc >= 12
+              : targetAc >= 12
                 ? 'gambeson'
                 : 'no armor'
-    badge = 'Knave'
+    const targetHp = finiteNumber(overrides.hp) ?? exactHp ?? knaveHitPoints(hdProfile.count)
+    const attackBonus =
+      finiteNumber(overrides.attackBonus) ??
+      (sameSystem ? sourceProfile.attackBonus : undefined) ??
+      hd
+    badge = 'Knave · First Edition'
     rows = [
-      { k: 'HD', v: hd + ' (' + hp + ' hp)' },
-      { k: 'AC', v: asc + ' (as ' + armName + ')' },
+      { k: 'HD', v: `${hdProfile.notation} (${targetHp} hp)` },
+      { k: 'AC', v: `${targetAc} (as ${armName})` },
       {
         k: 'Atk',
         v: A.map(
-          (a) => lo(a.n) + ' ' + hit(hd) + ' (' + a.d + (a.note ? ', ' + a.note : '') + ')',
+          (a) => lo(a.n) + ' ' + hit(attackBonus) + ' (' + a.d + (a.note ? ', ' + a.note : '') + ')',
         ).join(', '),
       },
+      { k: 'Saves', v: `${hit(hd)}; ability defenses ${10 + hd}` },
       { k: 'MV', v: mv + '′' },
       { k: 'ML', v: String(ml) },
       { k: 'AL', v: (m.al as string) || 'N' },

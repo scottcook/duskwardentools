@@ -639,9 +639,9 @@ export function ConverterPage() {
                       className="in"
                       id="f-hd"
                       name="hd"
-                      type="number"
-                      min={1}
-                      max={12}
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="e.g. 2, 3+1, 2*"
                       value={m.hd}
                       onChange={onField}
                     />

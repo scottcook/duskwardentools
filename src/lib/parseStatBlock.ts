@@ -5,7 +5,8 @@
  * the fields into the neutral ForgeMonster model used by the converter.
  */
 
-import type { ForgeMonster } from './convert'
+import type { ForgeMonster, ForgeSourceProfile } from './convert'
+import { averageHitPoints, parseHitDice } from './systemRules'
 
 export type ParseConfidence = 'high' | 'medium' | 'low' | 'none'
 
@@ -26,6 +27,8 @@ const SYSTEMS = [
   'morkborg',
   'pf2e',
   'knave',
+  'bfrpg',
+  'osric',
 ] as const
 
 type SystemId = (typeof SYSTEMS)[number]
@@ -41,6 +44,7 @@ const DEFAULT_FORGE: ForgeMonster = {
   kind: 'monster',
   stats: '',
   saves: '',
+  role: 'balanced',
   atkText: 'Strike 1d6',
   traitsText: '',
 }
@@ -110,6 +114,18 @@ function scoreSystem(text: string): DetectScore[] {
   if (/\batk\s*:\s*.*\+\d+\s*\(\d+d/i.test(text) && /\bml\s*\d+/i.test(text)) bump('knave', 3, 'Knave atk bonus')
   if (/\bas\s+(?:no armor|gambeson|chain|plate)\b/i.test(text)) bump('knave', 4, 'Knave armor tier')
 
+  if (/\bsave as\s*:/i.test(text) && /\bno\.\s*of\s*attacks\s*:/i.test(text)) {
+    bump('bfrpg', 6, 'Basic Fantasy monster fields')
+  }
+  if (/\barmor class\s*:\s*1\d\b/i.test(text) && /\bmorale\s*:\s*\d+/i.test(text)) {
+    bump('bfrpg', 3, 'ascending AC + morale')
+  }
+
+  if (/\bno\.\s*encountered\s*:/i.test(text)) bump('osric', 5, 'OSRIC encounter field')
+  if (/\blair probability\s*:/i.test(text)) bump('osric', 4, 'OSRIC lair field')
+  if (/\blevel\s*\/\s*xp\s*:/i.test(text)) bump('osric', 4, 'OSRIC level/XP')
+  if (/\bspecial defences\s*:/i.test(text)) bump('osric', 2, 'OSRIC spelling')
+
   return scores.sort((a, b) => b.score - a.score)
 }
 
@@ -143,9 +159,7 @@ function firstLine(text: string): string {
 }
 
 function toHitDice(raw: string): number {
-  const m = raw.match(/(\d+)(?:\s*[+*]\s*\d+)?/)
-  const n = m ? parseInt(m[1], 10) : NaN
-  return Number.isNaN(n) ? 1 : Math.max(1, n)
+  return parseHitDice(raw).count
 }
 
 function toAscendingAc(raw: string): number {
@@ -249,6 +263,69 @@ function normalizeAttacks(raw: string): string {
   return parts.length ? parts.join('; ') : DEFAULT_FORGE.atkText
 }
 
+function firstBonus(raw: string): number | undefined {
+  const match = raw.match(/([+−-]\d+)\s*(?:to hit|melee|missile fire|ranged|for strikes?)/i)
+  if (!match) return undefined
+  const value = Number(match[1].replace('−', '-'))
+  return Number.isFinite(value) ? value : undefined
+}
+
+function firstNumber(raw: string): number | undefined {
+  const match = raw.match(/-?\d+/)
+  return match ? Number(match[0]) : undefined
+}
+
+function sourceProfile(
+  system: string,
+  values: Omit<ForgeSourceProfile, 'system'>,
+): ForgeSourceProfile {
+  return { system, ...values }
+}
+
+function parseFiveEActions(text: string): {
+  atkText: string
+  attackBonus?: number
+} {
+  const lines = text.split('\n').map((line) => line.trim()).filter(Boolean)
+  const actionsIndex = lines.findIndex((line) => /^actions?\s*:?\s*$/i.test(line))
+  const candidates =
+    actionsIndex >= 0
+      ? lines.slice(actionsIndex + 1).filter((line) =>
+          !/^(?:reactions?|legendary actions?|lair actions?|bonus actions?)\s*:?\s*$/i.test(line),
+        )
+      : lines
+  const attacks: string[] = []
+  const bonuses: number[] = []
+
+  for (const line of candidates) {
+    const action = line.match(
+      /^([A-Z][A-Za-z '\-]+)\.\s+(?:Melee|Ranged|Melee or Ranged)[^:]*:\s*([+−-]\d+)\s+to hit.*?\bHit:\s*(?:\d+\s*)?\((\d+d\d+(?:\s*[+-]\s*\d+)?)\)(.*)$/i,
+    )
+    if (!action) continue
+    const bonus = Number(action[2].replace('−', '-'))
+    const note = action[4]
+      .replace(/^[,.\s]+/, '')
+      .replace(/\b(?:bludgeoning|piercing|slashing)\s+damage\b\.?/i, '')
+      .trim()
+    attacks.push(
+      `${action[1].trim()} ${action[3].replace(/\s+/g, '')}${note ? ` (${note})` : ''}`,
+    )
+    if (Number.isFinite(bonus)) bonuses.push(bonus)
+  }
+
+  if (attacks.length > 0) {
+    return {
+      atkText: attacks.join('; '),
+      attackBonus: bonuses.length ? Math.max(...bonuses) : undefined,
+    }
+  }
+
+  const compact =
+    lineValue(text, /actions?\s*:?\s*([^\n]+)/i) ||
+    lineValue(text, /(?:multiattack|attack)\s*:?\s*([^\n]+)/i)
+  return { atkText: normalizeAttacks(compact), attackBonus: firstBonus(compact) }
+}
+
 function collectTraits(text: string, skipPatterns: RegExp[]): string {
   const lines = text.split('\n').map((l) => l.trim()).filter(Boolean)
   const traits: string[] = []
@@ -294,6 +371,7 @@ function parse5e(text: string): { forge: Partial<ForgeMonster>; fieldsFound: str
   const typeMatch = typeLine.match(
     /^(?:tiny|small|medium|large|huge|gargantuan)\s+([a-z]+(?:\s+[a-z]+)?)\s*,?\s*(.*)$/i,
   )
+  const size = typeLine.match(/^(tiny|small|medium|large|huge|gargantuan)\b/i)?.[1]
   let kind = 'monster'
   let al: 'L' | 'N' | 'C' = 'N'
   let ep = ''
@@ -308,26 +386,28 @@ function parse5e(text: string): { forge: Partial<ForgeMonster>; fieldsFound: str
   }
 
   const acRaw = lineValue(text, /(?:armor class|ac)\s*:?\s*([^\n]+)/i)
-  const ac = acRaw ? toAscendingAc(acRaw) : DEFAULT_FORGE.ac
+  const ac = acRaw ? firstNumber(acRaw) ?? DEFAULT_FORGE.ac : DEFAULT_FORGE.ac
   if (acRaw) fields.push('ac')
 
   const hpLine = lineValue(text, /hit points?\s*:?\s*([^\n]+)/i)
+  const exactHp = firstNumber(hpLine)
   let hd = DEFAULT_FORGE.hd
-  const hdFromParen = hpLine.match(/\((\d+)d\d+/i)
+  const hdFromParen = hpLine.match(/\((\d+d\d+(?:\s*[+-]\s*\d+)?)\)/i)
   if (hdFromParen) {
     hd = toHitDice(hdFromParen[1])
     fields.push('hd')
+  } else if (exactHp !== undefined) {
+    warnings.push('Hit Points had no hit-dice expression; exact HP was preserved but HD needs review.')
   }
 
   const speedRaw = lineValue(text, /speed\s*:?\s*([^\n]+)/i)
   const speed = speedRaw ? toSpeedFeet(speedRaw) : DEFAULT_FORGE.speed
   if (speedRaw) fields.push('speed')
 
-  const actionsRaw =
-    lineValue(text, /actions?\s*:?\s*([^\n]+)/i) ||
-    lineValue(text, /(?:multiattack|attack)\s*:?\s*([^\n]+)/i)
-  const atkText = normalizeAttacks(actionsRaw)
-  if (actionsRaw) fields.push('attacks')
+  const parsedActions = parseFiveEActions(text)
+  const atkText = parsedActions.atkText
+  if (atkText !== DEFAULT_FORGE.atkText) fields.push('attacks')
+  const challengeRaw = lineValue(text, /\bchallenge\s*:?\s*(\d+\/\d+|\d+)/i)
 
   const traitsText = collectTraits(text, [
     /^[A-Z][A-Za-z .'-]+\s*,/i,
@@ -338,7 +418,26 @@ function parse5e(text: string): { forge: Partial<ForgeMonster>; fieldsFound: str
   if (traitsText) fields.push('traits')
 
   return {
-    forge: { name, ep, hd, ac, speed, ml: DEFAULT_FORGE.ml, al, kind, atkText, traitsText },
+    forge: {
+      name,
+      ep,
+      hd,
+      ac,
+      speed,
+      ml: DEFAULT_FORGE.ml,
+      al,
+      kind,
+      atkText,
+      traitsText,
+      sourceProfile: sourceProfile('dnd5e', {
+        hp: exactHp,
+        hitDice: hdFromParen?.[1]?.replace(/\s+/g, ''),
+        challenge: challengeRaw || undefined,
+        size: size ? titleCase(size) : undefined,
+        movement: speedRaw || undefined,
+        attackBonus: parsedActions.attackBonus,
+      }),
+    },
     fieldsFound: fields,
     warnings,
   }
@@ -354,8 +453,10 @@ function parseOse(text: string): { forge: Partial<ForgeMonster>; fieldsFound: st
   if (acRaw) fields.push('ac')
 
   const hdRaw = lineValue(text, /\bhd\s*:?\s*([^\n]+)/i)
-  const hd = hdRaw ? toHitDice(hdRaw) : DEFAULT_FORGE.hd
+  const hdProfile = parseHitDice(hdRaw, DEFAULT_FORGE.hd as number)
+  const hd = hdRaw ? hdProfile.notation : DEFAULT_FORGE.hd
   if (hdRaw) fields.push('hd')
+  const exactHp = hdRaw.match(/\((\d+)\s*hp\)/i)?.[1]
 
   const attRaw = lineValue(text, /\batt\s*:?\s*([^\n]+)/i)
   const atkText = attRaw
@@ -374,8 +475,12 @@ function parseOse(text: string): { forge: Partial<ForgeMonster>; fieldsFound: st
   const alRaw = lineValue(text, /\bal\s*:?\s*([^\n]+)/i)
   const al = alRaw ? toAlignment(alRaw) : DEFAULT_FORGE.al
   if (alRaw) fields.push('alignment')
+  const thac0Raw = lineValue(text, /\bthac0\s*:?\s*(\d+)/i)
+  const xpRaw = lineValue(text, /\bxp\s*:?\s*([\d,]+)/i)
+  const svRaw = lineValue(text, /\bsv\s*:?\s*([^\n]+)/i)
 
   const traitsText = collectTraits(text, [/^(?:AC|HD|Att|THAC0|MV|SV|ML|AL|XP)\b/i])
+  if (svRaw) fields.push('saves')
 
   return {
     forge: {
@@ -387,8 +492,17 @@ function parseOse(text: string): { forge: Partial<ForgeMonster>; fieldsFound: st
       ml,
       al,
       kind: 'monster',
+      saves: svRaw || undefined,
       atkText,
       traitsText,
+      sourceProfile: sourceProfile('ose', {
+        hp: exactHp ? Number(exactHp) : averageHitPoints(hdProfile),
+        hitDice: hdProfile.notation,
+        movement: mvRaw || undefined,
+        thac0: thac0Raw ? Number(thac0Raw) : undefined,
+        xp: xpRaw ? Number(xpRaw.replace(/,/g, '')) : undefined,
+        attackBonus: firstBonus(attRaw),
+      }),
     },
     fieldsFound: fields,
     warnings: [],
@@ -405,13 +519,14 @@ function parseAdd1(text: string): { forge: Partial<ForgeMonster>; fieldsFound: s
   if (acRaw) fields.push('ac')
 
   const hdRaw = lineValue(text, /hit dice\s*:?\s*([^\n]+)/i)
-  const hd = hdRaw ? toHitDice(hdRaw) : DEFAULT_FORGE.hd
+  const hdProfile = parseHitDice(hdRaw, DEFAULT_FORGE.hd as number)
+  const hd = hdRaw ? hdProfile.notation : DEFAULT_FORGE.hd
   if (hdRaw) fields.push('hd')
 
   const moveRaw = lineValue(text, /move\s*:?\s*([^\n]+)/i)
   const moveInches = moveRaw.match(/(\d+)\s*[″"]/)
   const speed = moveInches
-    ? Math.round(Number(moveInches[1]) * (10 / 3))
+    ? Math.round(Number(moveInches[1]) * 2.5)
     : moveRaw
       ? toSpeedFeet(moveRaw)
       : DEFAULT_FORGE.speed
@@ -435,6 +550,16 @@ function parseAdd1(text: string): { forge: Partial<ForgeMonster>; fieldsFound: s
   const sd = lineValue(text, /special defenses?\s*:?\s*([^\n]+)/i)
   const intel = lineValue(text, /intelligence\s*:?\s*([^\n]+)/i)
   const alRaw = lineValue(text, /alignment\s*:?\s*([^\n]+)/i)
+  const frequency = lineValue(text, /frequency\s*:?\s*([^\n]+)/i)
+  const numberAppearing =
+    lineValue(text, /no\.\s*(?:appearing|encountered)\s*:?\s*([^\n]+)/i)
+  const lairChance = lineValue(text, /(?:%\s*in\s*lair|lair probability)\s*:?\s*([^\n]+)/i)
+  const treasureType = lineValue(text, /treasure(?:\s+type)?\s*:?\s*([^\n]+)/i)
+  const magicResistance = lineValue(text, /magic resistance\s*:?\s*([^\n]+)/i)
+  const size = lineValue(text, /size\s*:?\s*([^\n]+)/i)
+  const psionics = lineValue(text, /psionic ability\s*:?\s*([^\n]+)/i)
+  const xpText = lineValue(text, /(?:level\s*\/\s*)?x\.?p\.?(?:\s+value)?\s*:?\s*([^\n]+)/i)
+  const xp = xpText.match(/[\d,]+/)?.[0]
 
   const traits: string[] = []
   if (sa && !/^nil$/i.test(sa)) traits.push(`${sa}: see special attack`)
@@ -442,12 +567,45 @@ function parseAdd1(text: string): { forge: Partial<ForgeMonster>; fieldsFound: s
   const traitsText = traits.join('\n')
   if (traitsText) fields.push('traits')
 
-  const kind = /animal/i.test(intel) ? 'beast' : /undead|plant|construct/i.test(text) ? 'undead' : 'monster'
+  const kind = /animal/i.test(intel)
+    ? 'beast'
+    : /undead/i.test(text)
+      ? 'undead'
+      : /construct/i.test(text)
+        ? 'construct'
+        : /plant/i.test(text)
+          ? 'plant'
+          : 'monster'
   const al = alRaw ? toAlignment(alRaw) : DEFAULT_FORGE.al
   if (alRaw) fields.push('alignment')
 
   return {
-    forge: { name, ep: '', hd, ac, speed, ml: DEFAULT_FORGE.ml, al, kind, atkText, traitsText },
+    forge: {
+      name,
+      ep: '',
+      hd,
+      ac,
+      speed,
+      ml: DEFAULT_FORGE.ml,
+      al,
+      kind,
+      atkText,
+      traitsText,
+      sourceProfile: sourceProfile('add1', {
+        hp: averageHitPoints(hdProfile),
+        hitDice: hdProfile.notation,
+        movement: moveRaw || undefined,
+        frequency: frequency || undefined,
+        numberAppearing: numberAppearing || undefined,
+        lairChance: lairChance || undefined,
+        treasureType: treasureType || undefined,
+        magicResistance: magicResistance || undefined,
+        intelligence: intel || undefined,
+        size: size || undefined,
+        psionics: psionics || undefined,
+        xp: xp ? Number(xp.replace(/,/g, '')) : undefined,
+      }),
+    },
     fieldsFound: fields,
     warnings: [],
   }
@@ -465,6 +623,7 @@ function parseShadowdark(text: string): { forge: Partial<ForgeMonster>; fieldsFo
   const hdRaw = lineValue(text, /\blv\s*:?\s*(\d+)/i) || lineValue(text, /\bhd\s*:?\s*([^\n]+)/i)
   const hd = hdRaw ? toHitDice(hdRaw) : DEFAULT_FORGE.hd
   if (hdRaw) fields.push('hd')
+  const hpRaw = lineValue(text, /\bhp\s*:?\s*(\d+)/i)
 
   const atkRaw = lineValue(text, /\batk\s*:?\s*([^\n]+)/i)
   const atkText = atkRaw ? normalizeAttacks(atkRaw) : DEFAULT_FORGE.atkText
@@ -481,7 +640,24 @@ function parseShadowdark(text: string): { forge: Partial<ForgeMonster>; fieldsFo
   const traitsText = collectTraits(text, [/^(?:AC|HP|ATK|MV|Stats|AL|LV)\b/i])
 
   return {
-    forge: { name, ep: '', hd, ac, speed, ml: DEFAULT_FORGE.ml, al, kind: 'monster', atkText, traitsText },
+    forge: {
+      name,
+      ep: '',
+      hd,
+      ac,
+      speed,
+      ml: DEFAULT_FORGE.ml,
+      al,
+      kind: 'monster',
+      atkText,
+      traitsText,
+      sourceProfile: sourceProfile('shadowdark', {
+        hp: hpRaw ? Number(hpRaw) : undefined,
+        level: Number(hd),
+        movement: mvRaw || undefined,
+        attackBonus: firstBonus(atkRaw),
+      }),
+    },
     fieldsFound: fields,
     warnings: [],
   }
@@ -497,8 +673,10 @@ function parseDcc(text: string): { forge: Partial<ForgeMonster>; fieldsFound: st
   if (acRaw) fields.push('ac')
 
   const hdRaw = lineValue(text, /\bhd\s*:?\s*([^\n]+)/i)
-  const hd = hdRaw ? toHitDice(hdRaw) : DEFAULT_FORGE.hd
+  const hdProfile = parseHitDice(hdRaw, DEFAULT_FORGE.hd as number)
+  const hd = hdRaw ? hdProfile.notation : DEFAULT_FORGE.hd
   if (hdRaw) fields.push('hd')
+  const exactHp = hdRaw?.match(/\((\d+)\s*hp\)/i)?.[1]
 
   const atkRaw = lineValue(text, /\batk\s*:?\s*([^\n]+)/i)
   const atkText = atkRaw ? normalizeAttacks(atkRaw) : DEFAULT_FORGE.atkText
@@ -512,6 +690,11 @@ function parseDcc(text: string): { forge: Partial<ForgeMonster>; fieldsFound: st
   const al = alRaw ? toAlignment(alRaw) : DEFAULT_FORGE.al
   if (alRaw) fields.push('alignment')
 
+  const initRaw = lineValue(text, /\binit\s*:?\s*([^\n]+)/i)
+  const actRaw = lineValue(text, /\bact\s*:?\s*([^\n]+)/i)
+  const critRaw = lineValue(text, /\bcrit\s*:?\s*([^\n]+)/i)
+  const svRaw = lineValue(text, /\bsv\s*:?\s*([^\n]+)/i)
+
   const spRaw = lineValue(text, /\bsp\s*:?\s*([^\n]+)/i)
   const traitsText =
     spRaw && !/^none$/i.test(spRaw)
@@ -521,9 +704,31 @@ function parseDcc(text: string): { forge: Partial<ForgeMonster>; fieldsFound: st
           .join('\n')
       : collectTraits(text, [/^(?:Init|Atk|AC|HD|MV|Act|SP|SV|AL)\b/i])
   if (traitsText) fields.push('traits')
+  if (svRaw) fields.push('saves')
 
   return {
-    forge: { name, ep: '', hd, ac, speed, ml: DEFAULT_FORGE.ml, al, kind: 'monster', atkText, traitsText },
+    forge: {
+      name,
+      ep: '',
+      hd,
+      ac,
+      speed,
+      ml: DEFAULT_FORGE.ml,
+      al,
+      kind: 'monster',
+      saves: svRaw || undefined,
+      atkText,
+      traitsText,
+      sourceProfile: sourceProfile('dcc', {
+        hp: exactHp ? Number(exactHp) : averageHitPoints(hdProfile),
+        hitDice: hdProfile.notation,
+        movement: mvRaw || undefined,
+        attackBonus: firstBonus(atkRaw),
+        initiative: firstBonus(initRaw),
+        actionDice: actRaw || undefined,
+        crit: critRaw || undefined,
+      }),
+    },
     fieldsFound: fields,
     warnings: [],
   }
@@ -558,7 +763,22 @@ function parseMorkborg(text: string): { forge: Partial<ForgeMonster>; fieldsFoun
   const traitsText = collectTraits(text, [/^(?:HP|Morale|Armor|Attack)\b/i])
 
   return {
-    forge: { name, ep: '', hd, ac, speed: DEFAULT_FORGE.speed, ml, al: 'C', kind: 'monster', atkText, traitsText },
+    forge: {
+      name,
+      ep: '',
+      hd,
+      ac,
+      speed: DEFAULT_FORGE.speed,
+      ml,
+      al: 'C',
+      kind: 'monster',
+      atkText,
+      traitsText,
+      sourceProfile: sourceProfile('morkborg', {
+        hp: hpRaw ? Number(hpRaw) : undefined,
+        movement: undefined,
+      }),
+    },
     fieldsFound: fields,
     warnings: [],
   }
@@ -569,8 +789,10 @@ function parsePf2e(text: string): { forge: Partial<ForgeMonster>; fieldsFound: s
   const name = stripName(firstLine(text))
   if (name) fields.push('name')
 
-  const lvlRaw = lineValue(text, /(?:level|creature)\s*:?\s*(\d+)/i)
-  const hd = lvlRaw ? Math.max(1, Number(lvlRaw) + 1) : DEFAULT_FORGE.hd
+  const lvlRaw =
+    lineValue(text, /creature\s+(-?\d+)/i) || lineValue(text, /(?:level|creature)\s*:?\s*(-?\d+)/i)
+  const level = lvlRaw ? Number(lvlRaw) : undefined
+  const hd = level !== undefined ? level + 1 : DEFAULT_FORGE.hd
   if (lvlRaw) fields.push('hd')
 
   const acRaw = lineValue(text, /\bac\s*:?\s*(\d+)/i)
@@ -584,14 +806,36 @@ function parsePf2e(text: string): { forge: Partial<ForgeMonster>; fieldsFound: s
   const speed = spdRaw ? toSpeedFeet(spdRaw) : DEFAULT_FORGE.speed
   if (spdRaw) fields.push('speed')
 
+  const perceptionRaw = lineValue(text, /perception\s*:?\s*([^\n]+)/i)
+  const savesRaw = lineValue(text, /\bsaves?\s*:?\s*([^\n]+)/i)
   const strikesRaw = lineValue(text, /strikes?\s*:?\s*([^\n]+)/i)
   const atkText = strikesRaw ? normalizeAttacks(strikesRaw) : DEFAULT_FORGE.atkText
   if (strikesRaw) fields.push('attacks')
+  if (savesRaw) fields.push('saves')
 
   const traitsText = collectTraits(text, [/^(?:Level|Creature|Perception|AC|HP|Saves|Speed|Strikes)\b/i])
 
   return {
-    forge: { name, ep: '', hd, ac, speed, ml: DEFAULT_FORGE.ml, al: DEFAULT_FORGE.al, kind: 'monster', atkText, traitsText },
+    forge: {
+      name,
+      ep: '',
+      hd,
+      ac,
+      speed,
+      ml: DEFAULT_FORGE.ml,
+      al: DEFAULT_FORGE.al,
+      kind: 'monster',
+      saves: savesRaw || undefined,
+      atkText,
+      traitsText,
+      sourceProfile: sourceProfile('pf2e', {
+        level,
+        hp: hpRaw ? Number(hpRaw) : undefined,
+        movement: spdRaw || undefined,
+        attackBonus: firstBonus(strikesRaw),
+        perception: firstBonus(perceptionRaw),
+      }),
+    },
     fieldsFound: fields,
     warnings: [],
   }
@@ -603,7 +847,8 @@ function parseKnave(text: string): { forge: Partial<ForgeMonster>; fieldsFound: 
   if (name) fields.push('name')
 
   const hdRaw = lineValue(text, /\bhd\s*:?\s*([^\n]+)/i)
-  const hd = hdRaw ? toHitDice(hdRaw) : DEFAULT_FORGE.hd
+  const hdProfile = parseHitDice(hdRaw, DEFAULT_FORGE.hd as number)
+  const hd = hdRaw ? hdProfile.notation : DEFAULT_FORGE.hd
   if (hdRaw) fields.push('hd')
 
   const acRaw = lineValue(text, /\bac\s*:?\s*(\d+)/i)
@@ -629,7 +874,24 @@ function parseKnave(text: string): { forge: Partial<ForgeMonster>; fieldsFound: 
   const traitsText = collectTraits(text, [/^(?:HD|AC|Atk|MV|ML|AL)\b/i])
 
   return {
-    forge: { name, ep: '', hd, ac, speed, ml, al, kind: 'monster', atkText, traitsText },
+    forge: {
+      name,
+      ep: '',
+      hd,
+      ac,
+      speed,
+      ml,
+      al,
+      kind: 'monster',
+      atkText,
+      traitsText,
+      sourceProfile: sourceProfile('knave', {
+        hitDice: hdProfile.notation,
+        hp: averageHitPoints(hdProfile),
+        movement: mvRaw || undefined,
+        attackBonus: firstBonus(atkRaw),
+      }),
+    },
     fieldsFound: fields,
     warnings: [],
   }
@@ -644,6 +906,8 @@ const PARSERS: Record<SystemId, (text: string) => ReturnType<typeof parse5e>> = 
   morkborg: parseMorkborg,
   pf2e: parsePf2e,
   knave: parseKnave,
+  bfrpg: parseOse,
+  osric: parseAdd1,
 }
 
 /**

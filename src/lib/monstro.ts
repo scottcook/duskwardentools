@@ -7,7 +7,8 @@
  * round-tripping through flattened text.
  */
 
-import type { ForgeMonster } from './convert'
+import type { ForgeMonster, ForgeSourceProfile } from './convert'
+import { averageHitPoints, parseHitDice } from './systemRules'
 
 export interface MonstroIndexItem {
   title: string
@@ -157,10 +158,9 @@ function toAscendingAc(raw: unknown): number {
   return n <= 9 ? 19 - n : n
 }
 
-/** "2*", "2* (9hp)", "3+1" → leading integer (min 1). */
-function toHitDice(raw: unknown): number {
-  const n = parseInt(String(raw ?? '').trim(), 10)
-  return Number.isNaN(n) ? 1 : Math.max(1, n)
+/** "2*", "2* (9hp)", "3+1" → structured hit dice profile. */
+function toHitDiceProfile(raw: unknown): ReturnType<typeof parseHitDice> {
+  return parseHitDice(raw, 1)
 }
 
 /** "90' (30')" → 30 (encounter speed); "30'" → 30. */
@@ -347,6 +347,19 @@ export function monstroToForge(
   portrayal: MonstroPortrayal,
 ): ForgeMonster {
   const stats = portrayal.stats ?? {}
+  const sourceSystem = portrayalSourceSystem(portrayal)
+  const hdProfile = toHitDiceProfile(stats.hitDice)
+  const movement = valueText(stats.movement ?? stats.move)
+  const hpMatch = String(stats.hitDice ?? '').match(/\((\d+)\s*hp\)/i)
+  const sourceProfile: ForgeSourceProfile = {
+    system: sourceSystem,
+    hp: hpMatch ? Number(hpMatch[1]) : averageHitPoints(hdProfile),
+    hitDice: hdProfile.notation,
+    movement: movement || undefined,
+    xp: stats.experiencePoints ? Number(String(stats.experiencePoints).replace(/,/g, '')) : undefined,
+    thac0: stats.thac0 ? Number(stats.thac0) : undefined,
+    attackBonus: stats.thac0 ? 19 - Number(stats.thac0) : undefined,
+  }
   const ep =
     item.description?.trim() ||
     detail['dc:description']?.trim() ||
@@ -356,7 +369,7 @@ export function monstroToForge(
   return {
     name: detail['dc:title']?.trim() || detail['schema:name']?.trim() || item.title,
     ep,
-    hd: toHitDice(stats.hitDice),
+    hd: hdProfile.notation,
     ac: toAscendingAc(stats.armorClass),
     speed: toSpeed(stats.movement ?? stats.move),
     ml: toMorale(stats.morale),
@@ -364,6 +377,7 @@ export function monstroToForge(
     kind: (item.type ?? '').toLowerCase() || 'monster',
     stats: toStatsText(stats),
     saves: toSavesText(stats),
+    sourceProfile,
     atkText: toAtkText(stats.attacks, stats.damage),
     traitsText: toTraitsText(portrayal),
   }
