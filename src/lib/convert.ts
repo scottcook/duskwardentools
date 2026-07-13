@@ -706,7 +706,16 @@ export function format(sys: string, m: ForgeMonster, sourceSystem = ''): Formatt
     ]
   }
 
-  return { badge, title: m.name || 'Nameless Thing', ep: m.ep || '', rows, sections: T }
+  return { badge, title: sanitizeCardTitle(m.name), ep: m.ep || '', rows, sections: T }
+}
+
+function sanitizeCardTitle(name: string | undefined): string {
+  const raw = String(name || '').trim()
+  if (!raw) return 'Nameless Thing'
+  if (raw.length > 80) return 'Unknown Creature'
+  if (/^(?:Armor Class|Hit Dice|AC|HD)\b/i.test(raw)) return 'Unknown Creature'
+  if ((raw.match(/:\s*\S/g) || []).length >= 2) return 'Unknown Creature'
+  return raw
 }
 
 /** Plain-text rendering used for the "copy stat block" action. */

@@ -149,13 +149,73 @@ export function detectSourceSystem(text: string): { system: string; confidence: 
 /* Shared extraction helpers                                                */
 /* ------------------------------------------------------------------------ */
 
+/** Labels that start a field line in common OSR / 5E / SD paste formats. */
+const NEXT_FIELD_LABEL =
+  /\s+(?=(?:Armor Class|Hit Dice|Hit Points|No\.\s*(?:of\s*)?Attacks|Damage\/Attack|Special Attacks?|Special Defenses?|Magic Resistance|Psionic Ability|No\.\s*(?:Appearing|Encountered)|%\s*in\s*Lair|Lair Probability|Treasure(?:\s+Type)?|Intelligence|Frequency|Alignment|Morale|Move|Attacks?|Damage|Speed|Challenge|THAC0|Save As|Saves?|XP|Level|AC|HD|HP|MV|ATT|ATK|ML|AL|SV|SP|Init|Act|Crit|LV)\s*:)/gi
+
+const NAME_MAX_LEN = 80
+
+/**
+ * Normalize line endings and reflow soft-wrapped / single-line pastes so
+ * labeled fields become real lines. Textareas soft-wrap without `\n`, which
+ * otherwise makes the whole block look like one "first line" name.
+ */
+export function normalizeStatBlockText(text: string): string {
+  let normalized = text
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .replace(/\u2028|\u2029/g, '\n')
+    .trim()
+
+  const lineCount = normalized.split('\n').filter((line) => line.trim()).length
+  if (lineCount >= 3) return normalized
+
+  return normalized.replace(NEXT_FIELD_LABEL, '\n').trim()
+}
+
 function lineValue(text: string, label: RegExp): string {
   const m = text.match(label)
-  return m?.[1]?.trim() ?? ''
+  if (!m?.[1]) return ''
+  let value = m[1].trim()
+  // Single-line pastes: stop before the next labeled field.
+  const cut = value.search(NEXT_FIELD_LABEL)
+  if (cut > 0) value = value.slice(0, cut).trim()
+  return value
 }
 
 function firstLine(text: string): string {
-  return text.split('\n').map((l) => l.trim()).find(Boolean) ?? ''
+  return text
+    .split(/\r\n|\r|\n|\u2028|\u2029/)
+    .map((l) => l.trim())
+    .find(Boolean) ?? ''
+}
+
+/** True when a line is a stat label, not a creature name. */
+export function looksLikeFieldLabelLine(line: string): boolean {
+  const t = line.trim()
+  if (!t) return true
+  if (
+    /^(?:Armor Class|Hit Dice|Hit Points|No\.\s*(?:of\s*)?Attacks|Damage\/Attack|Special Attacks?|Special Defenses?|Magic Resistance|Psionic Ability|No\.\s*(?:Appearing|Encountered)|%\s*in\s*Lair|Lair Probability|Treasure(?:\s+Type)?|Intelligence|Frequency|Alignment|Morale|Move|Attacks?|Damage|Speed|Challenge|THAC0|Save As|Saves?|XP|Level|AC|HD|HP|MV|ATT|ATK|ML|AL|SV|SP|Init|Act|Crit|LV)\s*:/i.test(
+      t,
+    )
+  ) {
+    return true
+  }
+  if (/^(?:AC|HD|HP|MV|ML|AL|ATT|ATK|LV|STR|DEX|CON|INT|WIS|CHA)\b/i.test(t)) return true
+  return false
+}
+
+/**
+ * Creature name from the first non-empty line, or '' when the paste starts
+ * on a labeled field (common for nameless OSR blocks).
+ */
+export function extractCreatureName(text: string): string {
+  const line = firstLine(text)
+  if (!line || looksLikeFieldLabelLine(line)) return ''
+  if (line.length > NAME_MAX_LEN) return ''
+  // Soft-wrapped paste that still looks like multiple labeled fields.
+  if ((line.match(/:\s*\S/g) || []).length >= 2) return ''
+  return stripName(line)
 }
 
 function toHitDice(raw: string): number {
@@ -351,8 +411,21 @@ function mergeForge(
   found: string[],
 ): { forge: ForgeMonster; fieldsFound: string[] } {
   const forge = { ...DEFAULT_FORGE, ...partial }
-  if (!forge.name) forge.name = 'Unknown Creature'
-  return { forge, fieldsFound: found }
+  let fieldsFound = [...found]
+
+  const name = String(forge.name || '').trim()
+  const nameOk =
+    Boolean(name) &&
+    name.length <= NAME_MAX_LEN &&
+    !looksLikeFieldLabelLine(name) &&
+    (name.match(/:\s*\S/g) || []).length < 2
+
+  if (!nameOk) {
+    forge.name = 'Unknown Creature'
+    fieldsFound = fieldsFound.filter((field) => field !== 'name')
+  }
+
+  return { forge, fieldsFound }
 }
 
 /* ------------------------------------------------------------------------ */
@@ -364,7 +437,7 @@ function parse5e(text: string): { forge: Partial<ForgeMonster>; fieldsFound: str
   const warnings: string[] = []
   const lines = text.split('\n').map((l) => l.trim()).filter(Boolean)
 
-  let name = stripName(firstLine(text))
+  let name = extractCreatureName(text)
   if (name) fields.push('name')
 
   const typeLine = lines[1] ?? ''
@@ -445,7 +518,7 @@ function parse5e(text: string): { forge: Partial<ForgeMonster>; fieldsFound: str
 
 function parseOse(text: string): { forge: Partial<ForgeMonster>; fieldsFound: string[]; warnings: string[] } {
   const fields: string[] = []
-  const name = stripName(firstLine(text))
+  const name = extractCreatureName(text)
   if (name) fields.push('name')
 
   const acRaw = lineValue(text, /\bac\s*:?\s*([^\n]+)/i)
@@ -511,12 +584,20 @@ function parseOse(text: string): { forge: Partial<ForgeMonster>; fieldsFound: st
 
 function parseAdd1(text: string): { forge: Partial<ForgeMonster>; fieldsFound: string[]; warnings: string[] } {
   const fields: string[] = []
-  const name = stripName(firstLine(text))
+  const name = extractCreatureName(text)
   if (name) fields.push('name')
 
-  const acRaw = lineValue(text, /(?:armor class|ac)\s*:?\s*(\d+)/i)
-  const ac = acRaw ? toAdndAscendingAc(acRaw) : DEFAULT_FORGE.ac
-  if (acRaw) fields.push('ac')
+  const acRaw = lineValue(text, /(?:armor class|ac)\s*:?\s*([^\n]+)/i)
+  let ac = DEFAULT_FORGE.ac
+  if (acRaw) {
+    const bracket = acRaw.match(/\[(\d+)/)
+    if (bracket) ac = Number(bracket[1])
+    else {
+      const n = parseInt(acRaw, 10)
+      ac = Number.isNaN(n) ? DEFAULT_FORGE.ac : toAdndAscendingAc(String(n))
+    }
+    fields.push('ac')
+  }
 
   const hdRaw = lineValue(text, /hit dice\s*:?\s*([^\n]+)/i)
   const hdProfile = parseHitDice(hdRaw, DEFAULT_FORGE.hd as number)
@@ -524,16 +605,21 @@ function parseAdd1(text: string): { forge: Partial<ForgeMonster>; fieldsFound: s
   if (hdRaw) fields.push('hd')
 
   const moveRaw = lineValue(text, /move\s*:?\s*([^\n]+)/i)
+  const moveFeetParen = moveRaw.match(/\((\d+)\s*'?\)/)
   const moveInches = moveRaw.match(/(\d+)\s*[″"]/)
-  const speed = moveInches
-    ? Math.round(Number(moveInches[1]) * 2.5)
-    : moveRaw
-      ? toSpeedFeet(moveRaw)
-      : DEFAULT_FORGE.speed
+  const speed = moveFeetParen
+    ? Number(moveFeetParen[1])
+    : moveInches
+      ? Math.round(Number(moveInches[1]) * 2.5)
+      : moveRaw
+        ? toSpeedFeet(moveRaw)
+        : DEFAULT_FORGE.speed
   if (moveRaw) fields.push('speed')
 
   const natt = lineValue(text, /no\.\s*of\s*attacks\s*:?\s*(\d+)/i)
   const dmg = lineValue(text, /damage\/attack\s*:?\s*([^\n]+)/i)
+  const attacksLine = lineValue(text, /(?:^|\n)\s*attacks?\s*:\s*([^\n]+)/i)
+  const damageLine = lineValue(text, /(?:^|\n)\s*damage\s*:\s*([^\n]+)/i)
   let atkText = DEFAULT_FORGE.atkText
   if (dmg) {
     const dice = dmg.split('/').map((d) => d.trim())
@@ -544,12 +630,21 @@ function parseAdd1(text: string): { forge: Partial<ForgeMonster>; fieldsFound: s
       atkText = dice.map((d, i) => `Attack ${i + 1} ${d}`).join('; ')
     }
     fields.push('attacks')
+  } else if (attacksLine || damageLine) {
+    const countMatch = attacksLine.match(/^(\d+)\s+/)
+    const count = countMatch ? Number(countMatch[1]) : 1
+    const attackName =
+      (attacksLine || 'Attack').replace(/^\d+\s+/, '').trim() || 'Attack'
+    const damage = (damageLine || '1d6').replace(/\s*\(see special\)\s*/i, '').trim()
+    atkText = count > 1 ? `${count} ${attackName} ${damage}` : `${attackName} ${damage}`
+    fields.push('attacks')
   }
 
   const sa = lineValue(text, /special attacks?\s*:?\s*([^\n]+)/i)
   const sd = lineValue(text, /special defenses?\s*:?\s*([^\n]+)/i)
   const intel = lineValue(text, /intelligence\s*:?\s*([^\n]+)/i)
   const alRaw = lineValue(text, /alignment\s*:?\s*([^\n]+)/i)
+  const mlRaw = lineValue(text, /morale\s*:?\s*([^\n]+)/i)
   const frequency = lineValue(text, /frequency\s*:?\s*([^\n]+)/i)
   const numberAppearing =
     lineValue(text, /no\.\s*(?:appearing|encountered)\s*:?\s*([^\n]+)/i)
@@ -564,6 +659,9 @@ function parseAdd1(text: string): { forge: Partial<ForgeMonster>; fieldsFound: s
   const traits: string[] = []
   if (sa && !/^nil$/i.test(sa)) traits.push(`${sa}: see special attack`)
   if (sd && !/^nil$/i.test(sd)) traits.push(`${sd}: see special defense`)
+  if (/paralyz/i.test(`${damageLine} ${attacksLine}`)) {
+    traits.push('Paralyzation: On a hit, save or be paralyzed (see source).')
+  }
   const traitsText = traits.join('\n')
   if (traitsText) fields.push('traits')
 
@@ -578,6 +676,8 @@ function parseAdd1(text: string): { forge: Partial<ForgeMonster>; fieldsFound: s
           : 'monster'
   const al = alRaw ? toAlignment(alRaw) : DEFAULT_FORGE.al
   if (alRaw) fields.push('alignment')
+  const ml = mlRaw ? toMorale(mlRaw) : DEFAULT_FORGE.ml
+  if (mlRaw) fields.push('ml')
 
   return {
     forge: {
@@ -586,7 +686,7 @@ function parseAdd1(text: string): { forge: Partial<ForgeMonster>; fieldsFound: s
       hd,
       ac,
       speed,
-      ml: DEFAULT_FORGE.ml,
+      ml,
       al,
       kind,
       atkText,
@@ -613,7 +713,7 @@ function parseAdd1(text: string): { forge: Partial<ForgeMonster>; fieldsFound: s
 
 function parseShadowdark(text: string): { forge: Partial<ForgeMonster>; fieldsFound: string[]; warnings: string[] } {
   const fields: string[] = []
-  const name = stripName(firstLine(text))
+  const name = extractCreatureName(text)
   if (name) fields.push('name')
 
   const acRaw = lineValue(text, /\bac\s*:?\s*(\d+)/i)
@@ -665,7 +765,7 @@ function parseShadowdark(text: string): { forge: Partial<ForgeMonster>; fieldsFo
 
 function parseDcc(text: string): { forge: Partial<ForgeMonster>; fieldsFound: string[]; warnings: string[] } {
   const fields: string[] = []
-  const name = stripName(firstLine(text))
+  const name = extractCreatureName(text)
   if (name) fields.push('name')
 
   const acRaw = lineValue(text, /\bac\s*:?\s*(\d+)/i)
@@ -736,7 +836,7 @@ function parseDcc(text: string): { forge: Partial<ForgeMonster>; fieldsFound: st
 
 function parseMorkborg(text: string): { forge: Partial<ForgeMonster>; fieldsFound: string[]; warnings: string[] } {
   const fields: string[] = []
-  const name = stripName(firstLine(text))
+  const name = extractCreatureName(text)
   if (name) fields.push('name')
 
   const hpRaw = lineValue(text, /\bhp\s*:?\s*(\d+)/i)
@@ -786,7 +886,7 @@ function parseMorkborg(text: string): { forge: Partial<ForgeMonster>; fieldsFoun
 
 function parsePf2e(text: string): { forge: Partial<ForgeMonster>; fieldsFound: string[]; warnings: string[] } {
   const fields: string[] = []
-  const name = stripName(firstLine(text))
+  const name = extractCreatureName(text)
   if (name) fields.push('name')
 
   const lvlRaw =
@@ -843,7 +943,7 @@ function parsePf2e(text: string): { forge: Partial<ForgeMonster>; fieldsFound: s
 
 function parseKnave(text: string): { forge: Partial<ForgeMonster>; fieldsFound: string[]; warnings: string[] } {
   const fields: string[] = []
-  const name = stripName(firstLine(text))
+  const name = extractCreatureName(text)
   if (name) fields.push('name')
 
   const hdRaw = lineValue(text, /\bhd\s*:?\s*([^\n]+)/i)
@@ -960,7 +1060,7 @@ function extractSupplementalFields(text: string): {
 /* ------------------------------------------------------------------------ */
 
 export function parseStatBlock(text: string, forcedSystem?: string): ParseResult {
-  const trimmed = text.trim()
+  const trimmed = normalizeStatBlockText(text)
   const warnings: string[] = []
 
   if (trimmed.length < 12) {

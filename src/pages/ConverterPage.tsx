@@ -106,6 +106,21 @@ STR 13  DEX 15  CON 10  INT 7  WIS 10  CHA 6
 Actions: Claws +4 (1d4) plus paralysis; Bite +4 (1d6)
 Challenge 1 (200 XP)`
 
+const SAMPLE_BEAST = BEASTS[0]
+
+const EMPTY_FORGE: ForgeMonster = {
+  name: '',
+  ep: '',
+  hd: '',
+  ac: '',
+  speed: '',
+  ml: '',
+  al: '',
+  kind: '',
+  atkText: '',
+  traitsText: '',
+}
+
 export function ConverterPage() {
   const { notify } = useToast()
   const [searchParams] = useSearchParams()
@@ -123,8 +138,8 @@ export function ConverterPage() {
   const [saving, setSaving] = useState(false)
   const [showMarkBackup, setShowMarkBackup] = useState(false)
 
-  const [m, setM] = useState<ForgeMonster>({ ...BEASTS[0] })
-  const [cm, setCm] = useState<ForgeMonster>({ ...BEASTS[0] })
+  const [m, setM] = useState<ForgeMonster>({ ...SAMPLE_BEAST })
+  const [cm, setCm] = useState<ForgeMonster>({ ...SAMPLE_BEAST })
   const [tgtDone, setTgtDone] = useState('shadowdark')
   const [scribe, setScribe] = useState(SCRIBE_SAMPLE)
   const [parseHint, setParseHint] = useState('')
@@ -387,6 +402,13 @@ export function ConverterPage() {
     setSourceInfo({ provider: 'manual', label: "Warden's specimen" })
   }
 
+  function clearForgeFields() {
+    setM({ ...EMPTY_FORGE })
+    setKnownSourceFields(new Set(FORGE_FIELDS))
+    setSourceText(null)
+    setSourceInfo({ provider: 'manual', label: "Warden's specimen" })
+  }
+
   const loadTomeIndex = useCallback(async () => {
     setTomeLoading(true)
     setTomeError('')
@@ -578,6 +600,13 @@ export function ConverterPage() {
                   notify('Stat block inscribed from scan')
                 }}
               />
+              {scribe === SCRIBE_SAMPLE && (
+                <div className="forge-sample">
+                  <p className="hint forge-sample-hint">
+                    Sample creature — edit the fields or clear to start your own.
+                  </p>
+                </div>
+              )}
               <textarea
                 className="ta"
                 value={scribe}
@@ -628,6 +657,16 @@ export function ConverterPage() {
                   {renderWarningList(infoConversionWarnings)}
                 </div>
               )}
+              <div className="forge-sample">
+                {m.name === SAMPLE_BEAST.name && (
+                  <p className="hint forge-sample-hint">
+                    Sample creature — edit the fields or clear to start your own.
+                  </p>
+                )}
+                <button type="button" className="link-btn forge-clear" onClick={clearForgeFields}>
+                  Clear fields
+                </button>
+              </div>
               <div className="fgrid">
                 <div className={'fld' + fieldTone('name')}>
                   <label className="flbl" htmlFor="f-name">
@@ -709,6 +748,7 @@ export function ConverterPage() {
                     Alignment
                   </label>
                   <select className="in" id="f-al" name="al" value={m.al} onChange={onField}>
+                    <option value="">—</option>
                     <option value="L">Lawful</option>
                     <option value="N">Neutral</option>
                     <option value="C">Chaotic</option>
@@ -915,7 +955,11 @@ export function ConverterPage() {
               disabled={rolling || blockingConversionWarnings.length > 0}
             >
               {blockingConversionWarnings.length > 0
-                ? `Fill ${blockingConversionWarnings.length} required field${blockingConversionWarnings.length === 1 ? '' : 's'}`
+                ? tab === 'scribe'
+                  ? 'Paste a complete stat block'
+                  : tab === 'tome'
+                    ? 'Load a creature first'
+                    : `Fill ${blockingConversionWarnings.length} required field${blockingConversionWarnings.length === 1 ? '' : 's'}`
                 : 'Transmute ⟶'}
             </button>
           </div>
