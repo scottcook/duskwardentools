@@ -29,10 +29,10 @@ export function normalizeScannedText(text: string): string {
 export function validateScannedStatBlock(text: string): ScannedStatBlockValidation {
   const normalizedText = normalizeScannedText(text)
   const parseResult = parseStatBlock(normalizedText)
-  const { forge, fieldsFound, confidence } = parseResult
+  const { fieldsFound, confidence } = parseResult
   const reasons: string[] = []
 
-  const hasName = Boolean(forge.name && forge.name.trim().length > 0)
+  const hasName = fieldsFound.includes('name')
   const hasAc = fieldsFound.includes('ac')
   const hasHdOrAttacks = fieldsFound.includes('hd') || fieldsFound.includes('attacks')
 

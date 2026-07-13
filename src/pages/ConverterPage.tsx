@@ -1,15 +1,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { BEASTS, format, plain, type ForgeMonster } from '../lib/convert'
-import { forgeToNewCreature } from '../lib/creatureBridge'
-import { CONVERTER_SYSTEMS } from '../lib/systems'
+import {
+  entrySourceFields,
+  entrySourceSystem,
+  entryToForge,
+  forgeToNewCreature,
+} from '../lib/creatureBridge'
+import { CONVERTER_SYSTEMS, SOURCE_SYSTEMS } from '../lib/systems'
 import {
   SOURCEBOOK_OPTIONS,
   fetchMonsterDetail,
   fetchMonsterIndex,
-  monstroToForge,
+  monstroSourceText,
+  monstroToForgeResult,
   pickPortrayal,
-  sourcebookLabel,
+  portrayalSourcebook,
+  portrayalSourceSystem,
+  sourcebookSummary,
   type MonstroIndexItem,
 } from '../lib/monstro'
 import { api } from '../lib/api'
@@ -17,8 +25,71 @@ import { useToast } from '../components/ToastProvider'
 import { D20Die } from '../components/D20Die'
 import { ScribeScan } from '../components/ScribeScan'
 import { parseStatBlock, systemLabelForParse } from '../lib/parseStatBlock'
+import {
+  getConversionWarnings,
+  type ForgeField,
+} from '../lib/conversionValidation'
+import type { CreatureSource } from '../lib/types'
 
 type Tab = 'scribe' | 'forge' | 'tome'
+
+interface SourceSnapshot {
+  system: string
+  text: string | null
+  source?: CreatureSource
+  fields: string[]
+}
+
+const FORGE_FIELDS: ForgeField[] = [
+  'name',
+  'hd',
+  'ac',
+  'speed',
+  'ml',
+  'al',
+  'kind',
+  'stats',
+  'saves',
+  'statsOverride',
+  'savesOverride',
+  'atkText',
+  'traitsText',
+]
+
+const FIELD_ALIASES: Record<string, ForgeField> = {
+  alignment: 'al',
+  morale: 'ml',
+  attacks: 'atkText',
+  traits: 'traitsText',
+}
+
+function normalizeSourceFields(fields: string[]): Set<ForgeField> {
+  return new Set(
+    fields
+      .map((field) => FIELD_ALIASES[field] ?? field)
+      .filter((field): field is ForgeField => FORGE_FIELDS.includes(field as ForgeField)),
+  )
+}
+
+function missingFromKnown(known: ReadonlySet<ForgeField>): Set<string> {
+  return new Set(FORGE_FIELDS.filter((field) => !known.has(field)))
+}
+
+function sourceFieldsForStorage(known: ReadonlySet<ForgeField>): string[] {
+  return Array.from(known)
+    .filter((field) => field !== 'statsOverride' && field !== 'savesOverride')
+    .map((field) =>
+      field === 'al'
+        ? 'alignment'
+        : field === 'ml'
+          ? 'morale'
+          : field === 'atkText'
+            ? 'attacks'
+            : field === 'traitsText'
+              ? 'traits'
+              : field,
+    )
+}
 
 const SCRIBE_SAMPLE = `GHOUL
 Medium undead, chaotic evil
@@ -31,6 +102,8 @@ Challenge 1 (200 XP)`
 
 export function ConverterPage() {
   const { notify } = useToast()
+  const [searchParams] = useSearchParams()
+  const creatureId = searchParams.get('creature')
 
   const [tab, setTab] = useState<Tab>('forge')
   const [src, setSrc] = useState('dnd5e')
@@ -49,6 +122,22 @@ export function ConverterPage() {
   const [scribe, setScribe] = useState(SCRIBE_SAMPLE)
   const [parseHint, setParseHint] = useState('')
   const [parseWarnings, setParseWarnings] = useState<string[]>([])
+  const [knownSourceFields, setKnownSourceFields] = useState<Set<ForgeField>>(
+    () => new Set(FORGE_FIELDS),
+  )
+  const [sourceText, setSourceText] = useState<string | null>(null)
+  const [sourceInfo, setSourceInfo] = useState<CreatureSource | undefined>({
+    provider: 'manual',
+    label: "Warden's specimen",
+  })
+  const [convertedSource, setConvertedSource] = useState<SourceSnapshot>({
+    system: 'dnd5e',
+    text: null,
+    source: { provider: 'manual', label: "Warden's specimen" },
+    fields: sourceFieldsForStorage(new Set(FORGE_FIELDS)),
+  })
+  const [warningAcknowledged, setWarningAcknowledged] = useState('')
+  const [loadingCreature, setLoadingCreature] = useState(false)
 
   const srcOverridden = useRef(false)
   const scribeDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -75,6 +164,65 @@ export function ConverterPage() {
   }, [])
 
   useEffect(() => {
+    if (!creatureId) return
+    let active = true
+    setLoadingCreature(true)
+
+    void api
+      .getCreature(creatureId)
+      .then((entry) => {
+        if (!active) return
+        if (!entry) {
+          notify('That library creature could not be found', 'err')
+          return
+        }
+
+        const forge = entryToForge(entry)
+        const sourceSystem = entrySourceSystem(entry)
+        const fields = normalizeSourceFields(entrySourceFields(entry))
+        const targetSystem = CONVERTER_SYSTEMS.some((system) => system.value === entry.output_json?.system)
+          ? String(entry.output_json?.system)
+          : 'shadowdark'
+        const source = entry.parsed_json?.source ?? {
+          provider: 'library' as const,
+          label: 'Library source',
+        }
+
+        setM(forge)
+        setCm({ ...forge })
+        setSrc(sourceSystem)
+        setTgt(targetSystem)
+        setTgtDone(targetSystem)
+        setKnownSourceFields(fields)
+        setSourceText(entry.source_text)
+        setSourceInfo(source)
+        setConvertedSource({
+          system: sourceSystem,
+          text: entry.source_text,
+          source,
+          fields: sourceFieldsForStorage(fields),
+        })
+        setSel(-1)
+        setTab('forge')
+        setWarningAcknowledged('')
+        srcOverridden.current = false
+        notify(`“${forge.name}” returned to the forge`)
+      })
+      .catch((error: unknown) => {
+        if (active) {
+          notify(error instanceof Error ? error.message : 'Could not open that library creature', 'err')
+        }
+      })
+      .finally(() => {
+        if (active) setLoadingCreature(false)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [creatureId, notify])
+
+  useEffect(() => {
     if (tab !== 'scribe') return
     if (scribeDebounce.current) clearTimeout(scribeDebounce.current)
 
@@ -84,6 +232,10 @@ export function ConverterPage() {
 
       if (result.fieldsFound.length >= 2) {
         setM(result.forge)
+        setKnownSourceFields(normalizeSourceFields(result.fieldsFound))
+        setSourceText(scribe)
+        setSourceInfo({ provider: 'paste', label: 'Pasted stat block' })
+        setWarningAcknowledged('')
         setSel(-1)
         if (!srcOverridden.current && result.confidence !== 'none') {
           setSrc(result.system)
@@ -106,11 +258,58 @@ export function ConverterPage() {
     }
   }, [scribe, tab, src])
 
+  const missingSourceFields = useMemo(
+    () => missingFromKnown(knownSourceFields),
+    [knownSourceFields],
+  )
+  const conversionWarnings = useMemo(
+    () => getConversionWarnings(m, src, tgt, missingSourceFields),
+    [m, src, tgt, missingSourceFields],
+  )
+  const warningSignature = useMemo(
+    () => conversionWarnings.map((warning) => `${warning.field}:${warning.message}`).join('|'),
+    [conversionWarnings],
+  )
+
   const doConvert = useCallback(
     (targetOverride?: string) => {
       if (rolling) return
-      const snapshot = { ...m }
       const target = targetOverride ?? tgt
+      const warnings = getConversionWarnings(m, src, target, missingSourceFields)
+      const signature = warnings.map((warning) => `${warning.field}:${warning.message}`).join('|')
+
+      if (warnings.length > 0 && warningAcknowledged !== signature) {
+        setWarningAcknowledged(signature)
+        setTab('forge')
+        window.requestAnimationFrame(() => {
+          const fieldIds: Record<ForgeField, string> = {
+            name: 'f-name',
+            hd: 'f-hd',
+            ac: 'f-ac',
+            speed: 'f-sp',
+            ml: 'f-ml',
+            al: 'f-al',
+            kind: 'f-kind',
+            stats: 'f-stats',
+            saves: 'f-saves',
+            statsOverride: 'f-stats-override',
+            savesOverride: 'f-saves-override',
+            atkText: 'f-atk',
+            traitsText: 'f-tr',
+          }
+          document.getElementById(fieldIds[warnings[0].field])?.focus()
+        })
+        notify(`Review ${warnings.length} source warning${warnings.length === 1 ? '' : 's'} in the Forge`)
+        return
+      }
+
+      const snapshot = { ...m }
+      const sourceSnapshot: SourceSnapshot = {
+        system: src,
+        text: sourceText,
+        source: sourceInfo,
+        fields: sourceFieldsForStorage(knownSourceFields),
+      }
       setRolling(true)
       iv.current = setInterval(() => setFace(1 + Math.floor(Math.random() * 20)), 75)
       to.current = setTimeout(() => {
@@ -118,21 +317,41 @@ export function ConverterPage() {
         setRolling(false)
         setFace(20)
         setCm(snapshot)
+        setConvertedSource(sourceSnapshot)
         setTgtDone(target)
         setFlip((f) => !f)
       }, 850)
     },
-    [rolling, m, tgt],
+    [
+      rolling,
+      m,
+      tgt,
+      src,
+      missingSourceFields,
+      warningAcknowledged,
+      sourceText,
+      sourceInfo,
+      knownSourceFields,
+      notify,
+    ],
   )
 
   function onField(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) {
     const { name, value } = e.target
     setM((prev) => ({ ...prev, [name]: value }))
+    if (FORGE_FIELDS.includes(name as ForgeField)) {
+      setKnownSourceFields((current) => new Set(current).add(name as ForgeField))
+    }
+    setWarningAcknowledged('')
   }
 
   function pickBeast(i: number) {
     setSel(i)
     setM({ ...BEASTS[i] })
+    setKnownSourceFields(new Set(FORGE_FIELDS))
+    setSourceText(null)
+    setSourceInfo({ provider: 'manual', label: "Warden's specimen" })
+    setWarningAcknowledged('')
   }
 
   const loadTomeIndex = useCallback(async () => {
@@ -176,13 +395,30 @@ export function ConverterPage() {
     setTomeError('')
     try {
       const detail = await fetchMonsterDetail(item.slug)
-      const portrayal = pickPortrayal(detail, tomeBook)
+      const portrayal = pickPortrayal(detail, tomeBook, item.sourcebooks ?? [])
       if (!portrayal) throw new Error('No stat block found')
-      const forged = monstroToForge(item, detail, portrayal)
+      const imported = monstroToForgeResult(item, detail, portrayal)
+      const sourcebook = portrayalSourcebook(portrayal)
+      const sourceSystem = portrayalSourceSystem(portrayal)
+      const source: CreatureSource = {
+        provider: 'monstro',
+        label: `monstro.cc · ${sourcebook.label}`,
+        sourcebook: sourcebook.label,
+        sourcebookId: sourcebook.id,
+        url: `https://monstro.cc/monster/${item.slug}/`,
+      }
+      const fields = normalizeSourceFields(imported.fieldsFound)
+      const forged = imported.forge
       setM(forged)
+      setSrc(sourceSystem)
+      setKnownSourceFields(fields)
+      setSourceText(monstroSourceText(item, detail, portrayal))
+      setSourceInfo(source)
+      setWarningAcknowledged('')
+      srcOverridden.current = false
       setSel(-1)
       setTab('forge')
-      notify(`“${forged.name}” drawn from the tome — review, then transmute`)
+      notify(`“${forged.name}” drawn from ${sourcebook.label} — review, then transmute`)
     } catch {
       setTomeError('That page of the tome is torn — try another creature.')
     } finally {
@@ -192,10 +428,11 @@ export function ConverterPage() {
 
   function onTgt(v: string) {
     setTgt(v)
+    setWarningAcknowledged('')
     doConvert(v)
   }
 
-  const block = format(tgtDone, cm)
+  const block = format(tgtDone, cm, convertedSource.system)
 
   function copyText() {
     try {
@@ -213,6 +450,7 @@ export function ConverterPage() {
       app: 'Duskwarden',
       exported: new Date().toISOString(),
       system: tgtDone,
+      source: convertedSource,
       monster: { ...cm },
       block,
     }
@@ -230,8 +468,14 @@ export function ConverterPage() {
   async function saveToLibrary() {
     setSaving(true)
     try {
-      const created = await api.createCreature(forgeToNewCreature(cm, src, tgtDone))
-      notify(`“${created.title}” saved to your library`)
+      const created = await api.createCreature(
+        forgeToNewCreature(cm, convertedSource.system, tgtDone, {
+          sourceText: convertedSource.text,
+          source: convertedSource.source,
+          sourceFields: convertedSource.fields,
+        }),
+      )
+      notify(`“${created.title}” saved with converted and source versions`)
     } catch (e) {
       notify(e instanceof Error ? e.message : 'Could not save creature', 'err')
     } finally {
@@ -267,10 +511,11 @@ export function ConverterPage() {
               onChange={(e) => {
                 srcOverridden.current = true
                 setSrc(e.target.value)
+                setWarningAcknowledged('')
               }}
               aria-label="Source system"
             >
-              {CONVERTER_SYSTEMS.map((s) => (
+              {SOURCE_SYSTEMS.map((s) => (
                 <option key={s.value} value={s.value}>
                   {s.label}
                 </option>
@@ -332,8 +577,48 @@ export function ConverterPage() {
 
           {tab === 'forge' && (
             <div className="pbody">
+              {loadingCreature && <p className="hint">Returning the saved creature to the forge…</p>}
+              {conversionWarnings.length > 0 && (
+                <div className="conversion-warning" role="status">
+                  <strong>
+                    Review {conversionWarnings.length} source warning
+                    {conversionWarnings.length === 1 ? '' : 's'}
+                  </strong>
+                  <ul>
+                    {conversionWarnings.map((warning) => (
+                      <li key={`${warning.field}-${warning.message}`}>
+                        <button
+                          type="button"
+                          className="link-btn"
+                          onClick={() => {
+                            const ids: Partial<Record<ForgeField, string>> = {
+                              name: 'f-name',
+                              hd: 'f-hd',
+                              ac: 'f-ac',
+                              speed: 'f-sp',
+                              ml: 'f-ml',
+                              al: 'f-al',
+                              kind: 'f-kind',
+                              stats: 'f-stats',
+                              saves: 'f-saves',
+                              statsOverride: 'f-stats-override',
+                              savesOverride: 'f-saves-override',
+                              atkText: 'f-atk',
+                              traitsText: 'f-tr',
+                            }
+                            document.getElementById(ids[warning.field] ?? '')?.focus()
+                          }}
+                        >
+                          {warning.label}:
+                        </button>{' '}
+                        {warning.message}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               <div className="fgrid">
-                <div className="fld">
+                <div className={'fld' + (conversionWarnings.some((w) => w.field === 'name') ? ' field-warning' : '')}>
                   <label className="flbl" htmlFor="f-name">
                     Name
                   </label>
@@ -346,7 +631,7 @@ export function ConverterPage() {
                   <input className="in" id="f-ep" name="ep" value={m.ep} onChange={onField} />
                 </div>
                 <div className="fnum">
-                  <div className="fld">
+                  <div className={'fld' + (conversionWarnings.some((w) => w.field === 'hd') ? ' field-warning' : '')}>
                     <label className="flbl" htmlFor="f-hd">
                       Hit Dice
                     </label>
@@ -361,7 +646,7 @@ export function ConverterPage() {
                       onChange={onField}
                     />
                   </div>
-                  <div className="fld">
+                  <div className={'fld' + (conversionWarnings.some((w) => w.field === 'ac') ? ' field-warning' : '')}>
                     <label className="flbl" htmlFor="f-ac">
                       AC (asc.)
                     </label>
@@ -376,7 +661,7 @@ export function ConverterPage() {
                       onChange={onField}
                     />
                   </div>
-                  <div className="fld">
+                  <div className={'fld' + (conversionWarnings.some((w) => w.field === 'speed') ? ' field-warning' : '')}>
                     <label className="flbl" htmlFor="f-sp">
                       Speed (ft)
                     </label>
@@ -424,7 +709,98 @@ export function ConverterPage() {
                   </label>
                   <input className="in" id="f-kind" name="kind" value={m.kind} onChange={onField} />
                 </div>
-                <div className="fld fw">
+                <div
+                  className={
+                    'fld fw' +
+                    (conversionWarnings.some((warning) => warning.field === 'stats')
+                      ? ' field-warning'
+                      : '')
+                  }
+                >
+                  <label className="flbl" htmlFor="f-stats">
+                    Source stats / abilities — when present
+                  </label>
+                  <input
+                    className="in"
+                    id="f-stats"
+                    name="stats"
+                    value={m.stats ?? ''}
+                    onChange={onField}
+                    placeholder="Not present in source"
+                  />
+                </div>
+                <div
+                  className={
+                    'fld fw' +
+                    (conversionWarnings.some((warning) => warning.field === 'saves')
+                      ? ' field-warning'
+                      : '')
+                  }
+                >
+                  <label className="flbl" htmlFor="f-saves">
+                    Source saves — when present
+                  </label>
+                  <input
+                    className="in"
+                    id="f-saves"
+                    name="saves"
+                    value={m.saves ?? ''}
+                    onChange={onField}
+                    placeholder="Not present in source"
+                  />
+                </div>
+                {(tgt === 'dnd5e' || tgt === 'shadowdark' || m.statsOverride) && (
+                  <div
+                    className={
+                      'fld fw' +
+                      (conversionWarnings.some((warning) => warning.field === 'statsOverride')
+                        ? ' field-warning'
+                        : '')
+                    }
+                  >
+                    <label className="flbl" htmlFor="f-stats-override">
+                      {CONVERTER_SYSTEMS.find((system) => system.value === tgt)?.label} stats override
+                    </label>
+                    <input
+                      className="in"
+                      id="f-stats-override"
+                      name="statsOverride"
+                      value={m.statsOverride ?? ''}
+                      onChange={onField}
+                      placeholder="Optional — leave blank to use translated or derived stats"
+                    />
+                  </div>
+                )}
+                {(['ose', 'dcc', 'pf2e'].includes(tgt) || m.savesOverride) && (
+                  <div
+                    className={
+                      'fld fw' +
+                      (conversionWarnings.some((warning) => warning.field === 'savesOverride')
+                        ? ' field-warning'
+                        : '')
+                    }
+                  >
+                    <label className="flbl" htmlFor="f-saves-override">
+                      {CONVERTER_SYSTEMS.find((system) => system.value === tgt)?.label} saves override
+                    </label>
+                    <input
+                      className="in"
+                      id="f-saves-override"
+                      name="savesOverride"
+                      value={m.savesOverride ?? ''}
+                      onChange={onField}
+                      placeholder="Optional — leave blank to use target-system derived saves"
+                    />
+                  </div>
+                )}
+                <div
+                  className={
+                    'fld fw' +
+                    (conversionWarnings.some((warning) => warning.field === 'atkText')
+                      ? ' field-warning'
+                      : '')
+                  }
+                >
                   <label className="flbl" htmlFor="f-atk">
                     Attacks — “2 Claws 1d4 (paralysis); Bite 1d6”
                   </label>
@@ -523,7 +899,12 @@ export function ConverterPage() {
                       <span className="te">
                         {[mon.type, mon.biome].filter(Boolean).join(' · ') || mon.description}
                       </span>
-                      <span className="th">{sourcebookLabel(mon.sourcebooks?.[0])}</span>
+                      <span
+                        className="th tome-sources"
+                        title={sourcebookSummary(mon.sourcebooks, tomeBook)}
+                      >
+                        {sourcebookSummary(mon.sourcebooks, tomeBook)}
+                      </span>
                     </button>
                   ))}
 
@@ -553,7 +934,9 @@ export function ConverterPage() {
               <span className="dienum">{face}</span>
             </div>
             <button className="go" onClick={() => doConvert()} disabled={rolling}>
-              Transmute ⟶
+              {conversionWarnings.length > 0 && warningAcknowledged !== warningSignature
+                ? `Review ${conversionWarnings.length} warning${conversionWarnings.length === 1 ? '' : 's'}`
+                : 'Transmute ⟶'}
             </button>
           </div>
         </section>

@@ -39,6 +39,8 @@ const DEFAULT_FORGE: ForgeMonster = {
   ml: 8,
   al: 'N',
   kind: 'monster',
+  stats: '',
+  saves: '',
   atkText: 'Strike 1d6',
   traitsText: '',
 }
@@ -644,6 +646,51 @@ const PARSERS: Record<SystemId, (text: string) => ReturnType<typeof parse5e>> = 
   knave: parseKnave,
 }
 
+/**
+ * Stats and saves occur in enough different layouts that extracting them once,
+ * after the system-specific structural parse, is more reliable than repeating
+ * the same permissive expressions in every parser.
+ */
+function extractSupplementalFields(text: string): {
+  partial: Partial<ForgeMonster>
+  fieldsFound: string[]
+} {
+  const lines = text.split('\n').map((line) => line.trim()).filter(Boolean)
+  const partial: Partial<ForgeMonster> = {}
+  const fieldsFound: string[] = []
+
+  const labelledStats = lines
+    .map((line) => line.match(/^(?:stats?|abilities)\s*:?\s*(.+)$/i)?.[1]?.trim())
+    .find(Boolean)
+  const abilityLine = lines.find(
+    (line) =>
+      /\bSTR\b/i.test(line) &&
+      /\bDEX\b/i.test(line) &&
+      (/\bCON\b/i.test(line) || /\bWIS\b/i.test(line)),
+  )
+  const shadowdarkStats = lines.find(
+    (line) =>
+      /^(?:stats?\s*:?\s*)?S\s*[+−-]?\d+/i.test(line) &&
+      /\bD\s*[+−-]?\d+/i.test(line) &&
+      /\bW\s*[+−-]?\d+/i.test(line),
+  )
+  const stats = labelledStats || abilityLine || shadowdarkStats
+  if (stats) {
+    partial.stats = stats
+    fieldsFound.push('stats')
+  }
+
+  const saves = lines
+    .map((line) => line.match(/^(?:saving throws?|saves?|sv)\s*:?\s*(.+)$/i)?.[1]?.trim())
+    .find(Boolean)
+  if (saves) {
+    partial.saves = saves
+    fieldsFound.push('saves')
+  }
+
+  return { partial, fieldsFound }
+}
+
 /* ------------------------------------------------------------------------ */
 /* Public API                                                               */
 /* ------------------------------------------------------------------------ */
@@ -671,7 +718,11 @@ export function parseStatBlock(text: string, forcedSystem?: string): ParseResult
     : 'dnd5e') as SystemId
 
   const parsed = PARSERS[system](trimmed)
-  const { forge, fieldsFound } = mergeForge(parsed.forge, parsed.fieldsFound)
+  const supplemental = extractSupplementalFields(trimmed)
+  const { forge, fieldsFound } = mergeForge(
+    { ...parsed.forge, ...supplemental.partial },
+    Array.from(new Set([...parsed.fieldsFound, ...supplemental.fieldsFound])),
+  )
 
   if (fieldsFound.length < 2) {
     warnings.push('Only a few fields were recognized — review the forge before transmuting.')

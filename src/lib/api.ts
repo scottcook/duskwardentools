@@ -31,6 +31,7 @@ export interface DataApi {
   deleteProject(id: string): Promise<void>
 
   listCreatures(opts?: ListCreaturesOpts): Promise<Entry[]>
+  getCreature(id: string): Promise<Entry | null>
   createCreature(input: NewCreature): Promise<Entry>
   assignCreatureToProject(entryId: string, projectId: string | null): Promise<Entry>
   deleteCreature(entryId: string): Promise<void>
@@ -126,6 +127,18 @@ class SupabaseApi implements DataApi {
     if (error) throw error
     // Search across parsed_json is done client-side for accuracy.
     return (data as Entry[]).filter((e) => matchesSearch(e, opts.search))
+  }
+
+  async getCreature(id: string): Promise<Entry | null> {
+    const sb = getSupabase()
+    const { data, error } = await sb
+      .from('entries')
+      .select('*')
+      .eq('id', id)
+      .eq('type', 'creature')
+      .maybeSingle()
+    if (error) throw error
+    return (data as Entry) ?? null
   }
 
   async createCreature(input: NewCreature): Promise<Entry> {
@@ -276,6 +289,11 @@ class MockApi implements DataApi {
       list = list.filter((e) => e.project_id === opts.projectId)
     list = list.filter((e) => matchesSearch(e, opts.search)).sort(byName)
     return this.delay(list)
+  }
+
+  async getCreature(id: string): Promise<Entry | null> {
+    const entry = this.entries().find((candidate) => candidate.id === id && candidate.type === 'creature')
+    return this.delay(entry ?? null)
   }
 
   async createCreature(input: NewCreature): Promise<Entry> {

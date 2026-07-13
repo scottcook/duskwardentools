@@ -11,11 +11,15 @@ database.
 - **Projects** — create / rename / delete campaigns; each is a vault of creatures.
 - **Creature Library** — search 160+ saved creatures by name, trait, tag, attack,
   or system; filter by system and by project assignment; add / move / remove a
-  creature to a project; view the full stat block; delete.
+  creature to a project; switch between converted and original source blocks;
+  send any saved creature back to the converter; export the complete library;
+  delete.
 - **Converter** — a faithful build of the design's two-panel transmuter. Edit a
   beast in the neutral "forge", roll the die, and render it into D&D 5E, OSE/B/X,
   AD&D 1E, Shadowdark, DCC, Mörk Borg, Pathfinder 2E, or Knave. Copy the block,
-  download JSON, or **save it straight into your library**.
+  download JSON, or **save both the converted block and its source straight into
+  your library**. Missing source fields are surfaced before conversion instead
+  of silently relying on fallback arithmetic.
 
 ## Stack
 

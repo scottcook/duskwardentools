@@ -20,6 +20,27 @@ export interface CreatureAction {
   description?: string
 }
 
+/** Where an imported source stat block came from. */
+export interface CreatureSource {
+  provider: 'paste' | 'monstro' | 'library' | 'manual'
+  label?: string
+  sourcebook?: string
+  sourcebookId?: string
+  url?: string
+}
+
+/** One rendered line in a converted, system-specific stat block. */
+export interface OutputStatRow {
+  k: string
+  v: string
+}
+
+/** One rendered trait/action in a converted stat block. */
+export interface OutputSection {
+  h: string
+  d: string
+}
+
 /**
  * `parsed_json` — the neutral, pre-conversion reading of a stat block.
  * Fields are all optional because real data is heterogeneous.
@@ -34,16 +55,24 @@ export interface ParsedCreature {
   movement?: string
   thac0?: number
   saves?: string
+  stats?: string
   alignment?: string
+  kind?: string
   attacks?: CreatureAttack[]
   specialActions?: CreatureAction[]
   description?: string
+  source?: CreatureSource
+  /** Forge fields that were actually present in the source, before fallbacks. */
+  sourceFields?: string[]
   [key: string]: unknown
 }
 
 /** `output_json` — the converted stat block (system-specific). */
 export interface OutputCreature {
   name?: string
+  system?: string
+  sourceSystem?: string
+  badge?: string
   ac?: number
   hp?: number
   morale?: number
@@ -56,6 +85,10 @@ export interface OutputCreature {
   lootNotes?: string
   threatTier?: number
   outputProfile?: string
+  rows?: OutputStatRow[]
+  sections?: OutputSection[]
+  text?: string
+  generatedBy?: string
   [key: string]: unknown
 }
 

@@ -13,6 +13,7 @@ import { Spinner } from '../components/Spinner'
 import { EmptyState } from '../components/EmptyState'
 import { useToast } from '../components/ToastProvider'
 import type { NewProject } from '../lib/types'
+import { downloadLibraryExport } from '../lib/libraryExport'
 
 type Assignment = 'all' | 'assigned' | 'unassigned'
 
@@ -101,6 +102,12 @@ export function LibraryPage() {
     }
   }
 
+  function downloadAll() {
+    if (!creatures) return
+    downloadLibraryExport(projects, creatures)
+    notify(`Downloaded ${creatures.length} creature${creatures.length === 1 ? '' : 's'}`)
+  }
+
   const total = creatures?.length ?? 0
 
   return (
@@ -113,6 +120,9 @@ export function LibraryPage() {
           </p>
         </div>
         <div className="pagehead-actions">
+          <button className="btn" onClick={downloadAll} disabled={creatures === null}>
+            ↓ Download all
+          </button>
           <Link className="btn" to="/convert">
             ⟶ Convert a new creature
           </Link>
@@ -190,6 +200,13 @@ export function LibraryPage() {
           <div className="grid">
             {filtered.map((c) => (
               <CreatureCard key={c.id} entry={c} onView={setViewing}>
+                <Link
+                  className="btn btn-sm"
+                  to={`/convert?creature=${encodeURIComponent(c.id)}`}
+                  aria-label={`Convert ${creatureName(c)} again`}
+                >
+                  ↻ Convert
+                </Link>
                 <AddToProjectMenu
                   projects={projects}
                   currentProjectId={c.project_id}
@@ -215,17 +232,26 @@ export function LibraryPage() {
           entry={viewing}
           onClose={() => setViewing(null)}
           footer={
-            <AddToProjectMenu
-              projects={projects}
-              currentProjectId={viewing.project_id}
-              onAssign={async (pid) => {
-                await assign(viewing, pid)
-                setViewing((v) => (v ? { ...v, project_id: pid } : v))
-              }}
-              onCreateProject={() => {
-                setNewProjectFor(viewing)
-              }}
-            />
+            <>
+              <Link
+                className="btn"
+                to={`/convert?creature=${encodeURIComponent(viewing.id)}`}
+                onClick={() => setViewing(null)}
+              >
+                ↻ Convert again
+              </Link>
+              <AddToProjectMenu
+                projects={projects}
+                currentProjectId={viewing.project_id}
+                onAssign={async (pid) => {
+                  await assign(viewing, pid)
+                  setViewing((v) => (v ? { ...v, project_id: pid } : v))
+                }}
+                onCreateProject={() => {
+                  setNewProjectFor(viewing)
+                }}
+              />
+            </>
           }
         />
       )}

@@ -11,6 +11,7 @@ export const SYSTEM_LABELS: Record<string, string> = {
   bx: 'B/X',
   bfrpg: 'Basic Fantasy',
   adnd1e: 'AD&D 1E',
+  osric: 'OSRIC',
   cairn: 'Cairn',
   other: 'Other',
   // Converter codes
@@ -39,3 +40,27 @@ export const CONVERTER_SYSTEMS: { value: string; label: string }[] = [
   { value: 'pf2e', label: 'Pathfinder 2E' },
   { value: 'knave', label: 'Knave' },
 ]
+
+/**
+ * Source selectors also include systems Duskwarden can ingest but does not
+ * currently render as a conversion target.
+ */
+export const SOURCE_SYSTEMS: { value: string; label: string }[] = [
+  ...CONVERTER_SYSTEMS,
+  { value: 'bfrpg', label: 'Basic Fantasy RPG' },
+  { value: 'osric', label: 'OSRIC' },
+  { value: 'other', label: 'Other / Unknown' },
+]
+
+/** Normalize legacy database codes before binding the converter source select. */
+export function normalizeSourceSystem(code?: string | null): string {
+  if (!code) return 'other'
+  const aliases: Record<string, string> = {
+    '5e': 'dnd5e',
+    bx: 'ose',
+    adnd1e: 'add1',
+    cairn: 'other',
+  }
+  const normalized = aliases[code] ?? code
+  return SOURCE_SYSTEMS.some((system) => system.value === normalized) ? normalized : 'other'
+}

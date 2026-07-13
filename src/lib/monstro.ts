@@ -53,6 +53,46 @@ export function sourcebookLabel(slug?: string): string {
   return match?.label ?? slug.replace(/-/g, ' ')
 }
 
+function sourcebookIdForPortrayal(portrayal: MonstroPortrayal): string {
+  const id = portrayal['fabio:isPartOf']?.['@id'] ?? ''
+  return id.split('/').filter(Boolean).pop()?.toLowerCase() ?? ''
+}
+
+export function portrayalSourcebook(portrayal: MonstroPortrayal): {
+  id: string
+  label: string
+} {
+  const id = sourcebookIdForPortrayal(portrayal)
+  const label =
+    portrayal['fabio:isPartOf']?.['schema:name']?.trim() ||
+    portrayal['dc:source']?.trim() ||
+    sourcebookLabel(id)
+  return { id, label }
+}
+
+/** Converter source-system code represented by a Monstro portrayal. */
+export function portrayalSourceSystem(portrayal: MonstroPortrayal): string {
+  const { id, label } = portrayalSourcebook(portrayal)
+  const source = `${id} ${label}`.toLowerCase()
+  if (source.includes('bfrpg') || source.includes('basic fantasy')) return 'bfrpg'
+  if (source.includes('osric')) return 'osric'
+  if (
+    source.includes('ose') ||
+    source.includes('old-school essentials') ||
+    source.includes('carcass crawler')
+  ) {
+    return 'ose'
+  }
+  return 'other'
+}
+
+/** Show every available source instead of implying that the first will be used. */
+export function sourcebookSummary(sourcebooks: string[] = [], activeFilter = ''): string {
+  if (activeFilter) return sourcebookLabel(activeFilter)
+  const labels = Array.from(new Set(sourcebooks.map(sourcebookLabel)))
+  return labels.length > 0 ? labels.join(' · ') : 'unknown source'
+}
+
 /* ------------------------------------------------------------------------ */
 /* Fetchers (index cached in module memory for the session)                 */
 /* ------------------------------------------------------------------------ */
@@ -74,17 +114,22 @@ export async function fetchMonsterDetail(slug: string): Promise<MonstroDetail> {
   return (await res.json()) as MonstroDetail
 }
 
-/** Pick the portrayal matching the active sourcebook filter, else the first. */
+/**
+ * Pick the active sourcebook. With "All sourcebooks", prefer the index's
+ * advertised order so the row label and imported portrayal cannot disagree.
+ */
 export function pickPortrayal(
   detail: MonstroDetail,
   sourcebookFilter?: string,
+  preferredSourcebooks: string[] = [],
 ): MonstroPortrayal | undefined {
   const portrayals = Array.isArray(detail['fabio:hasPortrayal'])
     ? detail['fabio:hasPortrayal']
     : []
-  if (sourcebookFilter) {
+  const preferences = sourcebookFilter ? [sourcebookFilter] : preferredSourcebooks
+  for (const preference of preferences) {
     const match = portrayals.find((p) =>
-      (p['fabio:isPartOf']?.['@id'] ?? '').toLowerCase().includes(sourcebookFilter),
+      (p['fabio:isPartOf']?.['@id'] ?? '').toLowerCase().includes(preference.toLowerCase()),
     )
     if (match) return match
   }
@@ -148,7 +193,9 @@ function toAlignment(raw: unknown): 'L' | 'N' | 'C' {
 function toAtkText(attacks: unknown, damage: unknown): string {
   const list = Array.isArray(attacks)
     ? attacks.map((a) => String(a).trim()).filter(Boolean)
-    : []
+    : typeof attacks === 'string'
+      ? attacks.split(/[;,]/).map((a) => a.trim()).filter(Boolean)
+      : []
   const damageText = String(damage ?? '').trim()
   const sharedDice = damageText.match(DICE_RE)?.[0]?.replace(/\s+/g, '') ?? ''
   const sharedNote = damageText
@@ -192,6 +239,108 @@ function toTraitsText(portrayal: MonstroPortrayal): string {
     .join('\n')
 }
 
+function valueText(value: unknown): string {
+  if (typeof value === 'string' || typeof value === 'number') return String(value).trim()
+  if (Array.isArray(value)) return value.map(valueText).filter(Boolean).join(', ')
+  return ''
+}
+
+function toStatsText(stats: Record<string, unknown>): string {
+  const direct =
+    valueText(stats.abilityScores) ||
+    valueText(stats.abilities) ||
+    valueText(stats.attributeModifiers)
+  if (direct) return direct
+
+  const names = [
+    ['strength', 'STR'],
+    ['dexterity', 'DEX'],
+    ['constitution', 'CON'],
+    ['intelligence', 'INT'],
+    ['wisdom', 'WIS'],
+    ['charisma', 'CHA'],
+  ] as const
+  const values = names
+    .map(([key, label]) => {
+      const value = valueText(stats[key] ?? stats[label.toLowerCase()])
+      return value ? `${label} ${value}` : ''
+    })
+    .filter(Boolean)
+  return values.join(', ')
+}
+
+function toSavesText(stats: Record<string, unknown>): string {
+  return (
+    valueText(stats.savingThrows) ||
+    valueText(stats.saves) ||
+    valueText(stats.saveAs)
+  )
+}
+
+export interface MonstroForgeResult {
+  forge: ForgeMonster
+  fieldsFound: string[]
+}
+
+export function monstroToForgeResult(
+  item: MonstroIndexItem,
+  detail: MonstroDetail,
+  portrayal: MonstroPortrayal,
+): MonstroForgeResult {
+  const stats = portrayal.stats ?? {}
+  const statsText = toStatsText(stats)
+  const savesText = toSavesText(stats)
+  const forge = monstroToForge(item, detail, portrayal)
+  const fieldsFound = ['name']
+
+  if (stats.hitDice !== undefined) fieldsFound.push('hd')
+  if (stats.armorClass !== undefined) fieldsFound.push('ac')
+  if (stats.movement !== undefined || stats.move !== undefined) fieldsFound.push('speed')
+  if (stats.morale !== undefined) fieldsFound.push('morale')
+  if (stats.alignment !== undefined) fieldsFound.push('alignment')
+  if (item.type) fieldsFound.push('kind')
+  if (stats.attacks !== undefined || stats.damage !== undefined) fieldsFound.push('attacks')
+  if (forge.traitsText) fieldsFound.push('traits')
+  if (statsText) fieldsFound.push('stats')
+  if (savesText) fieldsFound.push('saves')
+
+  return {
+    forge: { ...forge, stats: statsText, saves: savesText },
+    fieldsFound,
+  }
+}
+
+/** Human-readable preservation of the exact Monstro portrayal used. */
+export function monstroSourceText(
+  item: MonstroIndexItem,
+  detail: MonstroDetail,
+  portrayal: MonstroPortrayal,
+): string {
+  const source = portrayalSourcebook(portrayal)
+  const name = detail['dc:title']?.trim() || detail['schema:name']?.trim() || item.title
+  const stats = Object.entries(portrayal.stats ?? {})
+    .map(([key, value]) => `${key}: ${valueText(value) || JSON.stringify(value)}`)
+    .join('\n')
+  const abilities = (portrayal.specialAbilities ?? [])
+    .map((ability) =>
+      [ability.name?.trim(), ability.description?.replace(/\s+/g, ' ').trim()]
+        .filter(Boolean)
+        .join(': '),
+    )
+    .filter(Boolean)
+    .join('\n')
+
+  return [
+    name.toUpperCase(),
+    `[${source.label}]`,
+    portrayal.description?.trim(),
+    stats,
+    abilities,
+  ]
+    .filter(Boolean)
+    .join('\n\n')
+}
+
 export function monstroToForge(
   item: MonstroIndexItem,
   detail: MonstroDetail,
@@ -213,6 +362,8 @@ export function monstroToForge(
     ml: toMorale(stats.morale),
     al: toAlignment(stats.alignment),
     kind: (item.type ?? '').toLowerCase() || 'monster',
+    stats: toStatsText(stats),
+    saves: toSavesText(stats),
     atkText: toAtkText(stats.attacks, stats.damage),
     traitsText: toTraitsText(portrayal),
   }

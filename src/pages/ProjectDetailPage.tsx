@@ -152,9 +152,13 @@ export function ProjectDetailPage() {
         <div className="grid">
           {creatures.map((c) => (
             <CreatureCard key={c.id} entry={c} onView={setViewing}>
-              <button className="btn btn-sm" onClick={() => setViewing(c)} style={{ flex: 1 }}>
-                View
-              </button>
+              <Link
+                className="btn btn-sm"
+                to={`/convert?creature=${encodeURIComponent(c.id)}`}
+                style={{ flex: 1 }}
+              >
+                ↻ Convert
+              </Link>
               <button
                 className="btn btn-sm btn-danger"
                 onClick={() => setRemoving(c)}
@@ -173,7 +177,21 @@ export function ProjectDetailPage() {
       {editing && (
         <ProjectFormModal initial={project} onSubmit={saveEdit} onClose={() => setEditing(false)} />
       )}
-      {viewing && <CreatureDetailModal entry={viewing} onClose={() => setViewing(null)} />}
+      {viewing && (
+        <CreatureDetailModal
+          entry={viewing}
+          onClose={() => setViewing(null)}
+          footer={
+            <Link
+              className="btn btn-gold"
+              to={`/convert?creature=${encodeURIComponent(viewing.id)}`}
+              onClick={() => setViewing(null)}
+            >
+              ↻ Convert again
+            </Link>
+          }
+        />
+      )}
       {removing && (
         <ConfirmDialog
           title="Remove from project?"

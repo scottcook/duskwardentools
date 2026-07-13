@@ -30,6 +30,13 @@ export interface ForgeMonster {
   ml: number | string
   al: 'L' | 'N' | 'C' | string
   kind: string
+  /** Optional source-provided ability scores/modifiers; otherwise derived. */
+  stats?: string
+  /** Optional source-provided saves; otherwise derived for systems that need them. */
+  saves?: string
+  /** Explicit target-system values supplied after reviewing a warning. */
+  statsOverride?: string
+  savesOverride?: string
   atkText: string
   traitsText: string
 }
@@ -183,6 +190,66 @@ const CR_BY_HD: string[] = [
 
 const mod = (score: number) => Math.floor((score - 10) / 2)
 
+function signed(value: number): string {
+  return value >= 0 ? `+${value}` : `−${Math.abs(value)}`
+}
+
+function abilityValue(text: string, label: string): number | undefined {
+  const match = text.match(new RegExp(`\\b${label}\\b\\s*[:=]?\\s*([+−-]?\\d+)`, 'i'))
+  if (!match) return undefined
+  const value = Number(match[1].replace('−', '-'))
+  return Number.isFinite(value) ? value : undefined
+}
+
+/**
+ * Translate the two ability formats the app can map without inventing data:
+ * D&D scores ↔ Shadowdark modifiers. Other cross-system pairs fall back to
+ * target-system derivation and are surfaced as review warnings.
+ */
+export function statsForTarget(
+  sourceSystem: string,
+  targetSystem: string,
+  sourceStats?: string,
+): string {
+  const text = String(sourceStats || '').trim()
+  if (!text) return ''
+  if (sourceSystem === targetSystem) return text
+
+  if (sourceSystem === 'dnd5e' && targetSystem === 'shadowdark') {
+    const labels = [
+      ['STR', 'S'],
+      ['DEX', 'D'],
+      ['CON', 'C'],
+      ['INT', 'I'],
+      ['WIS', 'W'],
+      ['CHA', 'Ch'],
+    ] as const
+    const values = labels.map(([source]) => abilityValue(text, source))
+    if (values.every((value): value is number => value !== undefined)) {
+      return labels.map(([, target], index) => `${target} ${signed(mod(values[index]))}`).join(', ')
+    }
+  }
+
+  if (sourceSystem === 'shadowdark' && targetSystem === 'dnd5e') {
+    const labels = [
+      ['S', 'STR'],
+      ['D', 'DEX'],
+      ['C', 'CON'],
+      ['I', 'INT'],
+      ['W', 'WIS'],
+      ['Ch', 'CHA'],
+    ] as const
+    const values = labels.map(([source]) => abilityValue(text, source))
+    if (values.every((value): value is number => value !== undefined)) {
+      return labels
+        .map(([, target], index) => `${target} ${Math.min(30, Math.max(1, 10 + values[index] * 2))}`)
+        .join(', ')
+    }
+  }
+
+  return ''
+}
+
 /** "2 Claws" → { count: 2, name: "claw" }; "Bite" → { count: 1, name: "bite" } */
 function atkParts(n: string): { count: number; name: string } {
   const m2 = n.match(/^(\d+)\s+(.*)$/)
@@ -192,7 +259,7 @@ function atkParts(n: string): { count: number; name: string } {
 }
 
 /** Render a forge monster into a target system's stat block. */
-export function format(sys: string, m: ForgeMonster): FormattedBlock {
+export function format(sys: string, m: ForgeMonster, sourceSystem = ''): FormattedBlock {
   const hd = Math.max(1, +m.hd || 1)
   const asc = +m.ac || 10
   const mv = +m.speed || 30
@@ -204,6 +271,11 @@ export function format(sys: string, m: ForgeMonster): FormattedBlock {
   const T = parseTraits(m.traitsText)
   const AL = AL_LABEL[m.al as string] || 'Neutral'
   const kind = lo(m.kind || '')
+  const sourceStats =
+    String(m.statsOverride || '').trim() || statsForTarget(sourceSystem, sys, m.stats)
+  const sourceSaves =
+    String(m.savesOverride || '').trim() ||
+    (sourceSystem === sys ? String(m.saves || '').trim() : '')
   const beastly = /beast|animal|vermin|ooze/.test(kind)
   const mindless = /undead|construct|plant/.test(kind)
 
@@ -232,7 +304,7 @@ export function format(sys: string, m: ForgeMonster): FormattedBlock {
       { k: 'Speed', v: mv + ' ft.' },
       {
         k: 'Abilities',
-        v: `STR ${str}, DEX ${dex}, CON ${con}, INT ${int}, WIS 10, CHA ${cha}`,
+        v: sourceStats || `STR ${str}, DEX ${dex}, CON ${con}, INT ${int}, WIS 10, CHA ${cha}`,
       },
       {
         k: 'Actions',
@@ -266,7 +338,7 @@ export function format(sys: string, m: ForgeMonster): FormattedBlock {
       },
       { k: 'THAC0', v: thac0 + ' [' + hit(ab) + ']' },
       { k: 'MV', v: mv * 4 + '′ (' + Math.round((mv * 4) / 30) * 10 + '′)' },
-      { k: 'SV', v: sv },
+      { k: 'SV', v: sourceSaves || sv },
       { k: 'ML', v: String(ml) },
       { k: 'AL', v: AL },
       { k: 'XP', v: String(OSE_XP[Math.min(hd, 12)] || 1100) },
@@ -321,7 +393,7 @@ export function format(sys: string, m: ForgeMonster): FormattedBlock {
       { k: 'MV', v: mv >= 40 ? 'double near' : mv <= 15 ? 'close' : 'near' },
       {
         k: 'Stats',
-        v: `S ${hit(s)}, D ${hit(d)}, C +0, I ${hit(i)}, W +0, Ch ${hit(ch)}`,
+        v: sourceStats || `S ${hit(s)}, D ${hit(d)}, C +0, I ${hit(i)}, W +0, Ch ${hit(ch)}`,
       },
       { k: 'AL', v: (m.al as string) || 'N' },
       { k: 'LV', v: String(hd) },
@@ -345,7 +417,7 @@ export function format(sys: string, m: ForgeMonster): FormattedBlock {
       { k: 'SP', v: T.length ? T.map((t) => lo(t.h)).join(', ') : 'none' },
       {
         k: 'SV',
-        v:
+        v: sourceSaves ||
           'Fort ' +
           hit(Math.ceil(hd / 2)) +
           ', Ref ' +
@@ -395,7 +467,9 @@ export function format(sys: string, m: ForgeMonster): FormattedBlock {
       { k: 'HP', v: String(hp2e) },
       {
         k: 'Saves',
-        v: 'Fort ' + hit(lvl + 5) + ', Ref ' + hit(lvl + 6) + ', Will ' + hit(lvl + 4),
+        v:
+          sourceSaves ||
+          'Fort ' + hit(lvl + 5) + ', Ref ' + hit(lvl + 6) + ', Will ' + hit(lvl + 4),
       },
       { k: 'Speed', v: mv + ' feet' },
       {
