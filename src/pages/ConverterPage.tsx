@@ -21,9 +21,12 @@ import {
   type MonstroIndexItem,
 } from '../lib/monstro'
 import { api } from '../lib/api'
+import { IS_DEMO } from '../lib/config'
+import { hasAckedMarkBackup } from '../lib/libraryPrefs'
 import { useToast } from '../components/ToastProvider'
 import { D20Die } from '../components/D20Die'
 import { ScribeScan } from '../components/ScribeScan'
+import { MarkBackupModal } from '../components/MarkBackupModal'
 import { parseStatBlock, systemLabelForParse } from '../lib/parseStatBlock'
 import {
   blockingWarnings,
@@ -118,6 +121,7 @@ export function ConverterPage() {
   const [flip, setFlip] = useState(false)
   const [copied, setCopied] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [showMarkBackup, setShowMarkBackup] = useState(false)
 
   const [m, setM] = useState<ForgeMonster>({ ...BEASTS[0] })
   const [cm, setCm] = useState<ForgeMonster>({ ...BEASTS[0] })
@@ -503,6 +507,9 @@ export function ConverterPage() {
         }),
       )
       notify(`“${created.title}” saved with converted and source versions`)
+      if (!IS_DEMO && !hasAckedMarkBackup()) {
+        setShowMarkBackup(true)
+      }
     } catch (e) {
       notify(e instanceof Error ? e.message : 'Could not save creature', 'err')
     } finally {
@@ -970,6 +977,8 @@ export function ConverterPage() {
           </div>
         </section>
       </div>
+
+      {showMarkBackup && <MarkBackupModal onClose={() => setShowMarkBackup(false)} />}
     </>
   )
 }

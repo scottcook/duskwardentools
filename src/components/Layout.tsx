@@ -28,6 +28,12 @@ export function Layout({ children }: { children: ReactNode }) {
   }, [location.pathname])
 
   useEffect(() => {
+    const onShowIdentity = () => setIdentity(true)
+    window.addEventListener('duskwarden-show-identity', onShowIdentity)
+    return () => window.removeEventListener('duskwarden-show-identity', onShowIdentity)
+  }, [])
+
+  useEffect(() => {
     if (!navOpen) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setNavOpen(false)
