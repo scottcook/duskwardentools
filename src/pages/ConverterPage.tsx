@@ -26,7 +26,10 @@ import { D20Die } from '../components/D20Die'
 import { ScribeScan } from '../components/ScribeScan'
 import { parseStatBlock, systemLabelForParse } from '../lib/parseStatBlock'
 import {
+  blockingWarnings,
   getConversionWarnings,
+  infoWarnings,
+  type ConversionWarning,
   type ForgeField,
 } from '../lib/conversionValidation'
 import type { CreatureSource } from '../lib/types'
@@ -136,7 +139,6 @@ export function ConverterPage() {
     source: { provider: 'manual', label: "Warden's specimen" },
     fields: sourceFieldsForStorage(new Set(FORGE_FIELDS)),
   })
-  const [warningAcknowledged, setWarningAcknowledged] = useState('')
   const [loadingCreature, setLoadingCreature] = useState(false)
 
   const srcOverridden = useRef(false)
@@ -204,7 +206,6 @@ export function ConverterPage() {
         })
         setSel(-1)
         setTab('forge')
-        setWarningAcknowledged('')
         srcOverridden.current = false
         notify(`“${forge.name}” returned to the forge`)
       })
@@ -235,7 +236,6 @@ export function ConverterPage() {
         setKnownSourceFields(normalizeSourceFields(result.fieldsFound))
         setSourceText(scribe)
         setSourceInfo({ provider: 'paste', label: 'Pasted stat block' })
-        setWarningAcknowledged('')
         setSel(-1)
         if (!srcOverridden.current && result.confidence !== 'none') {
           setSrc(result.system)
@@ -266,40 +266,72 @@ export function ConverterPage() {
     () => getConversionWarnings(m, src, tgt, missingSourceFields),
     [m, src, tgt, missingSourceFields],
   )
-  const warningSignature = useMemo(
-    () => conversionWarnings.map((warning) => `${warning.field}:${warning.message}`).join('|'),
+  const blockingConversionWarnings = useMemo(
+    () => blockingWarnings(conversionWarnings),
     [conversionWarnings],
   )
+  const infoConversionWarnings = useMemo(
+    () => infoWarnings(conversionWarnings),
+    [conversionWarnings],
+  )
+
+  function focusWarningField(field: ForgeField) {
+    const fieldIds: Record<ForgeField, string> = {
+      name: 'f-name',
+      hd: 'f-hd',
+      ac: 'f-ac',
+      speed: 'f-sp',
+      ml: 'f-ml',
+      al: 'f-al',
+      kind: 'f-kind',
+      stats: 'f-stats',
+      saves: 'f-saves',
+      statsOverride: 'f-stats-override',
+      savesOverride: 'f-saves-override',
+      atkText: 'f-atk',
+      traitsText: 'f-tr',
+    }
+    document.getElementById(fieldIds[field])?.focus()
+  }
+
+  function fieldTone(field: ForgeField): '' | ' field-warning' | ' field-info' {
+    if (blockingConversionWarnings.some((warning) => warning.field === field)) {
+      return ' field-warning'
+    }
+    if (infoConversionWarnings.some((warning) => warning.field === field)) {
+      return ' field-info'
+    }
+    return ''
+  }
+
+  function renderWarningList(warnings: ConversionWarning[]) {
+    return (
+      <ul>
+        {warnings.map((warning) => (
+          <li key={`${warning.severity}-${warning.field}-${warning.message}`}>
+            <button type="button" className="link-btn" onClick={() => focusWarningField(warning.field)}>
+              {warning.label}:
+            </button>{' '}
+            {warning.message}
+          </li>
+        ))}
+      </ul>
+    )
+  }
 
   const doConvert = useCallback(
     (targetOverride?: string) => {
       if (rolling) return
       const target = targetOverride ?? tgt
       const warnings = getConversionWarnings(m, src, target, missingSourceFields)
-      const signature = warnings.map((warning) => `${warning.field}:${warning.message}`).join('|')
+      const blocking = blockingWarnings(warnings)
 
-      if (warnings.length > 0 && warningAcknowledged !== signature) {
-        setWarningAcknowledged(signature)
+      if (blocking.length > 0) {
         setTab('forge')
         window.requestAnimationFrame(() => {
-          const fieldIds: Record<ForgeField, string> = {
-            name: 'f-name',
-            hd: 'f-hd',
-            ac: 'f-ac',
-            speed: 'f-sp',
-            ml: 'f-ml',
-            al: 'f-al',
-            kind: 'f-kind',
-            stats: 'f-stats',
-            saves: 'f-saves',
-            statsOverride: 'f-stats-override',
-            savesOverride: 'f-saves-override',
-            atkText: 'f-atk',
-            traitsText: 'f-tr',
-          }
-          document.getElementById(fieldIds[warnings[0].field])?.focus()
+          focusWarningField(blocking[0].field)
         })
-        notify(`Review ${warnings.length} source warning${warnings.length === 1 ? '' : 's'} in the Forge`)
+        notify(`Fill ${blocking.length} required field${blocking.length === 1 ? '' : 's'} in the Forge`)
         return
       }
 
@@ -328,7 +360,6 @@ export function ConverterPage() {
       tgt,
       src,
       missingSourceFields,
-      warningAcknowledged,
       sourceText,
       sourceInfo,
       knownSourceFields,
@@ -342,7 +373,6 @@ export function ConverterPage() {
     if (FORGE_FIELDS.includes(name as ForgeField)) {
       setKnownSourceFields((current) => new Set(current).add(name as ForgeField))
     }
-    setWarningAcknowledged('')
   }
 
   function pickBeast(i: number) {
@@ -351,7 +381,6 @@ export function ConverterPage() {
     setKnownSourceFields(new Set(FORGE_FIELDS))
     setSourceText(null)
     setSourceInfo({ provider: 'manual', label: "Warden's specimen" })
-    setWarningAcknowledged('')
   }
 
   const loadTomeIndex = useCallback(async () => {
@@ -414,7 +443,6 @@ export function ConverterPage() {
       setKnownSourceFields(fields)
       setSourceText(monstroSourceText(item, detail, portrayal))
       setSourceInfo(source)
-      setWarningAcknowledged('')
       srcOverridden.current = false
       setSel(-1)
       setTab('forge')
@@ -428,7 +456,6 @@ export function ConverterPage() {
 
   function onTgt(v: string) {
     setTgt(v)
-    setWarningAcknowledged('')
     doConvert(v)
   }
 
@@ -511,7 +538,6 @@ export function ConverterPage() {
               onChange={(e) => {
                 srcOverridden.current = true
                 setSrc(e.target.value)
-                setWarningAcknowledged('')
               }}
               aria-label="Source system"
             >
@@ -578,47 +604,25 @@ export function ConverterPage() {
           {tab === 'forge' && (
             <div className="pbody">
               {loadingCreature && <p className="hint">Returning the saved creature to the forge…</p>}
-              {conversionWarnings.length > 0 && (
-                <div className="conversion-warning" role="status">
+              {blockingConversionWarnings.length > 0 && (
+                <div className="conversion-warning" role="alert">
                   <strong>
-                    Review {conversionWarnings.length} source warning
-                    {conversionWarnings.length === 1 ? '' : 's'}
+                    Required: {blockingConversionWarnings.length} field
+                    {blockingConversionWarnings.length === 1 ? '' : 's'}
                   </strong>
-                  <ul>
-                    {conversionWarnings.map((warning) => (
-                      <li key={`${warning.field}-${warning.message}`}>
-                        <button
-                          type="button"
-                          className="link-btn"
-                          onClick={() => {
-                            const ids: Partial<Record<ForgeField, string>> = {
-                              name: 'f-name',
-                              hd: 'f-hd',
-                              ac: 'f-ac',
-                              speed: 'f-sp',
-                              ml: 'f-ml',
-                              al: 'f-al',
-                              kind: 'f-kind',
-                              stats: 'f-stats',
-                              saves: 'f-saves',
-                              statsOverride: 'f-stats-override',
-                              savesOverride: 'f-saves-override',
-                              atkText: 'f-atk',
-                              traitsText: 'f-tr',
-                            }
-                            document.getElementById(ids[warning.field] ?? '')?.focus()
-                          }}
-                        >
-                          {warning.label}:
-                        </button>{' '}
-                        {warning.message}
-                      </li>
-                    ))}
-                  </ul>
+                  {renderWarningList(blockingConversionWarnings)}
+                </div>
+              )}
+              {infoConversionWarnings.length > 0 && (
+                <div className="conversion-note" role="status">
+                  <strong>
+                    Conversion note{infoConversionWarnings.length === 1 ? '' : 's'}
+                  </strong>
+                  {renderWarningList(infoConversionWarnings)}
                 </div>
               )}
               <div className="fgrid">
-                <div className={'fld' + (conversionWarnings.some((w) => w.field === 'name') ? ' field-warning' : '')}>
+                <div className={'fld' + fieldTone('name')}>
                   <label className="flbl" htmlFor="f-name">
                     Name
                   </label>
@@ -631,7 +635,7 @@ export function ConverterPage() {
                   <input className="in" id="f-ep" name="ep" value={m.ep} onChange={onField} />
                 </div>
                 <div className="fnum">
-                  <div className={'fld' + (conversionWarnings.some((w) => w.field === 'hd') ? ' field-warning' : '')}>
+                  <div className={'fld' + fieldTone('hd')}>
                     <label className="flbl" htmlFor="f-hd">
                       Hit Dice
                     </label>
@@ -646,7 +650,7 @@ export function ConverterPage() {
                       onChange={onField}
                     />
                   </div>
-                  <div className={'fld' + (conversionWarnings.some((w) => w.field === 'ac') ? ' field-warning' : '')}>
+                  <div className={'fld' + fieldTone('ac')}>
                     <label className="flbl" htmlFor="f-ac">
                       AC (asc.)
                     </label>
@@ -661,7 +665,7 @@ export function ConverterPage() {
                       onChange={onField}
                     />
                   </div>
-                  <div className={'fld' + (conversionWarnings.some((w) => w.field === 'speed') ? ' field-warning' : '')}>
+                  <div className={'fld' + fieldTone('speed')}>
                     <label className="flbl" htmlFor="f-sp">
                       Speed (ft)
                     </label>
@@ -709,14 +713,7 @@ export function ConverterPage() {
                   </label>
                   <input className="in" id="f-kind" name="kind" value={m.kind} onChange={onField} />
                 </div>
-                <div
-                  className={
-                    'fld fw' +
-                    (conversionWarnings.some((warning) => warning.field === 'stats')
-                      ? ' field-warning'
-                      : '')
-                  }
-                >
+                <div className={'fld fw' + fieldTone('stats')}>
                   <label className="flbl" htmlFor="f-stats">
                     Source stats / abilities — when present
                   </label>
@@ -729,14 +726,7 @@ export function ConverterPage() {
                     placeholder="Not present in source"
                   />
                 </div>
-                <div
-                  className={
-                    'fld fw' +
-                    (conversionWarnings.some((warning) => warning.field === 'saves')
-                      ? ' field-warning'
-                      : '')
-                  }
-                >
+                <div className={'fld fw' + fieldTone('saves')}>
                   <label className="flbl" htmlFor="f-saves">
                     Source saves — when present
                   </label>
@@ -750,14 +740,7 @@ export function ConverterPage() {
                   />
                 </div>
                 {(tgt === 'dnd5e' || tgt === 'shadowdark' || m.statsOverride) && (
-                  <div
-                    className={
-                      'fld fw' +
-                      (conversionWarnings.some((warning) => warning.field === 'statsOverride')
-                        ? ' field-warning'
-                        : '')
-                    }
-                  >
+                  <div className={'fld fw' + fieldTone('statsOverride')}>
                     <label className="flbl" htmlFor="f-stats-override">
                       {CONVERTER_SYSTEMS.find((system) => system.value === tgt)?.label} stats override
                     </label>
@@ -772,14 +755,7 @@ export function ConverterPage() {
                   </div>
                 )}
                 {(['ose', 'dcc', 'pf2e'].includes(tgt) || m.savesOverride) && (
-                  <div
-                    className={
-                      'fld fw' +
-                      (conversionWarnings.some((warning) => warning.field === 'savesOverride')
-                        ? ' field-warning'
-                        : '')
-                    }
-                  >
+                  <div className={'fld fw' + fieldTone('savesOverride')}>
                     <label className="flbl" htmlFor="f-saves-override">
                       {CONVERTER_SYSTEMS.find((system) => system.value === tgt)?.label} saves override
                     </label>
@@ -793,14 +769,7 @@ export function ConverterPage() {
                     />
                   </div>
                 )}
-                <div
-                  className={
-                    'fld fw' +
-                    (conversionWarnings.some((warning) => warning.field === 'atkText')
-                      ? ' field-warning'
-                      : '')
-                  }
-                >
+                <div className={'fld fw' + fieldTone('atkText')}>
                   <label className="flbl" htmlFor="f-atk">
                     Attacks — “2 Claws 1d4 (paralysis); Bite 1d6”
                   </label>
@@ -933,9 +902,13 @@ export function ConverterPage() {
               <D20Die rolling={rolling} />
               <span className="dienum">{face}</span>
             </div>
-            <button className="go" onClick={() => doConvert()} disabled={rolling}>
-              {conversionWarnings.length > 0 && warningAcknowledged !== warningSignature
-                ? `Review ${conversionWarnings.length} warning${conversionWarnings.length === 1 ? '' : 's'}`
+            <button
+              className="go"
+              onClick={() => doConvert()}
+              disabled={rolling || blockingConversionWarnings.length > 0}
+            >
+              {blockingConversionWarnings.length > 0
+                ? `Fill ${blockingConversionWarnings.length} required field${blockingConversionWarnings.length === 1 ? '' : 's'}`
                 : 'Transmute ⟶'}
             </button>
           </div>

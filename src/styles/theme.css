@@ -370,28 +370,49 @@ main {
   font-family: 'JetBrains Mono', monospace;
   line-height: 1.6;
 }
-.conversion-warning {
+.conversion-warning,
+.conversion-note {
   margin: 0 0 14px;
   padding: 12px 14px;
-  border: 1px solid rgba(212, 160, 23, 0.55);
-  background: rgba(212, 160, 23, 0.08);
   color: var(--text);
   font-family: 'JetBrains Mono', monospace;
   font-size: 12px;
   line-height: 1.55;
+}
+.conversion-warning {
+  border: 1px solid rgba(212, 160, 23, 0.55);
+  background: rgba(212, 160, 23, 0.08);
+}
+.conversion-note {
+  border: 1px solid rgba(140, 155, 170, 0.35);
+  background: rgba(140, 155, 170, 0.06);
 }
 .conversion-warning strong {
   color: var(--acc);
   letter-spacing: 1px;
   text-transform: uppercase;
 }
-.conversion-warning ul {
+.conversion-note strong {
+  color: var(--muted, #9aa3ad);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.conversion-warning ul,
+.conversion-note ul {
   margin: 8px 0 0;
   padding-left: 18px;
 }
-.conversion-warning .link-btn {
+.conversion-warning .link-btn,
+.conversion-note .link-btn {
   font: inherit;
   color: var(--acc-2);
+}
+.field-info .flbl {
+  color: var(--muted, #9aa3ad);
+}
+.field-info .in,
+.field-info .ta {
+  border-color: rgba(140, 155, 170, 0.45);
 }
 
 /* scribe camera scan (mobile-only entry) -------------------------------- */

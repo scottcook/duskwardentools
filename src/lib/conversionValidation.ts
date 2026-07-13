@@ -16,10 +16,13 @@ export type ForgeField =
   | 'atkText'
   | 'traitsText'
 
+export type ConversionWarningSeverity = 'blocking' | 'info'
+
 export interface ConversionWarning {
   field: ForgeField
   label: string
   message: string
+  severity: ConversionWarningSeverity
 }
 
 const LABELS: Record<ForgeField, string> = {
@@ -42,13 +45,29 @@ function isBlank(value: unknown): boolean {
   return value === undefined || value === null || String(value).trim() === ''
 }
 
-function warning(field: ForgeField, message: string): ConversionWarning {
-  return { field, label: LABELS[field], message }
+function warning(
+  field: ForgeField,
+  message: string,
+  severity: ConversionWarningSeverity,
+): ConversionWarning {
+  return { field, label: LABELS[field], message, severity }
+}
+
+export function blockingWarnings(warnings: ConversionWarning[]): ConversionWarning[] {
+  return warnings.filter((w) => w.severity === 'blocking')
+}
+
+export function infoWarnings(warnings: ConversionWarning[]): ConversionWarning[] {
+  return warnings.filter((w) => w.severity === 'info')
 }
 
 /**
- * Warn instead of silently presenting fallback arithmetic as source truth.
- * Conversion remains available after the user has reviewed the Forge.
+ * Tiered conversion feedback:
+ * - blocking: blank essentials that must be filled before converting
+ * - info: missing source fields with forge fallbacks, or cross-system
+ *   stats/saves that will be derived from HD / kind / overrides
+ *
+ * Only blocking warnings gate Transmute.
  */
 export function getConversionWarnings(
   monster: ForgeMonster,
@@ -70,12 +89,13 @@ export function getConversionWarnings(
 
   for (const [field, value, message] of essential) {
     if (isBlank(value)) {
-      warnings.push(warning(field, message))
+      warnings.push(warning(field, message, 'blocking'))
     } else if (missingSourceFields.has(field)) {
       warnings.push(
         warning(
           field,
-          `${LABELS[field]} was not present in the ${source} source. Review the fallback value before converting to ${target}.`,
+          `${LABELS[field]} was not present in the ${source} source. Review the forge value before treating it as ${source} truth.`,
+          'info',
         ),
       )
     }
@@ -108,11 +128,11 @@ export function getConversionWarnings(
     warnings.push(
       warning(
         overrideField,
-        `${detail} Enter a target override or review the values Duskwarden derives from HD, speed, and creature kind.`,
+        `${detail} Duskwarden will derive values from HD, speed, and creature kind unless you enter a target override.`,
+        'info',
       ),
     )
   }
 
   return warnings
 }
-
