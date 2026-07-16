@@ -681,7 +681,7 @@ main {
   font-size: 11px;
   letter-spacing: 2px;
   text-transform: uppercase;
-  color: var(--dim);
+  color: var(--acc);
 }
 .in {
   background: var(--deep);
