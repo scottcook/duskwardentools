@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Duskwarden">
+  <title>Duskwarden</title>
+  <rect width="128" height="128" fill="#0b0908"/>
+  <rect x="6" y="6" width="116" height="116" fill="none" stroke="#3a3226" stroke-width="4"/>
+  <rect x="10" y="10" width="108" height="108" fill="none" stroke="#d4a017" stroke-opacity=".58" stroke-width="1.5"/>
+  <path fill="#d4a017" d="M60.64 29.80L60.64 97.24Q60.64 98.20 47.50 103.30Q34.36 108.40 31.42 108.40Q28.48 108.40 24.70 103.24Q20.92 98.08 20.92 90.88L20.92 33.28Q20.92 26.80 16 25.72L16 23.08L28.12 16.24Q30.76 17.32 33.04 19.78Q35.32 22.24 35.32 24.40L50.20 16Q52.36 16 56.50 20.92Q60.64 25.84 60.64 29.80ZM41.44 97.36Q43.72 97.36 46.12 95.44L46.12 38.80Q46.12 30.28 40 30.28Q37.60 30.28 35.32 32.08L35.32 88.48Q35.32 97.36 41.44 97.36Z" transform="translate(22.6 5) scale(1.08)"/>
+</svg>
