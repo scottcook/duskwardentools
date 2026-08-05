@@ -560,7 +560,10 @@ export function ConverterPage() {
         {/* ---- The Offering (input) ---- */}
         <section className="panel">
           <div className="phead">
-            <h3 className="ph2">Ⅰ · The Offering</h3>
+            <div className="phead-lead">
+              <h3 className="ph2">Ⅰ · The Offering</h3>
+              <span className="ph-hint">Select one of the 3 tabs</span>
+            </div>
             <select
               className="sel"
               value={src}
