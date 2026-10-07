@@ -12,9 +12,17 @@ import {
   averageDamage,
   averageHitPoints,
   dccCombatStats,
+  DRAGONBANE_EVADE,
+  dragonbaneArmorFromAc,
+  dragonbaneFerocity,
+  dragonbaneHitPoints,
+  dragonbaneMovementMeters,
+  dragonbaneSize,
+  recognizedDragonbaneSize,
   estimateFiveECr,
   fiveEProficiency,
   formatDccSaves,
+  formatDragonbaneMonsterAttacks,
   knaveHitPoints,
   morkBorgDamage,
   oseAttack,
@@ -62,6 +70,12 @@ export interface ForgeSourceProfile {
   psionics?: string
   thac0?: number
   xp?: number
+  /** Dragonbane initiative cards. Preserved only for same-system output. */
+  ferocity?: number
+  /** Dragonbane armor rating (damage reduction), not ascending AC. */
+  armorRating?: number
+  /** Dragonbane skill line, such as "Evade 15". */
+  skills?: string
 }
 
 export interface ForgeMonster {
@@ -183,8 +197,10 @@ export function parseAttacks(t: string): ParsedAttack[] {
     .map((s) => s.trim())
     .filter(Boolean)
     .map((s) => {
-      const m = s.match(/^(.*?)\s*(\d*d\d+(?:[+-]\d+)?)\s*(?:\((.+)\))?$/)
-      return m ? { n: m[1], d: m[2], note: m[3] || '' } : { n: s, d: '1d4', note: '' }
+      const m = s.match(/^(.*?)\s*(\d*d\d+(?:[+-]\d+)?)\s*(?:\((.+)\))?$/i)
+      return m
+        ? { n: m[1], d: m[2].toLowerCase(), note: m[3] || '' }
+        : { n: s, d: '1d4', note: '' }
     })
 }
 
@@ -671,6 +687,57 @@ export function format(sys: string, m: ForgeMonster, sourceSystem = ''): Formatt
         ).join('; '),
       },
     ]
+  } else if (sys === 'dragonbane') {
+    const derivedFerocity = dragonbaneFerocity(hd)
+    const ferocity =
+      sameSystem && sourceProfile.ferocity !== undefined ? sourceProfile.ferocity : derivedFerocity
+    const derivedArmor = dragonbaneArmorFromAc(targetAc)
+    const armor =
+      sameSystem && sourceProfile.armorRating !== undefined ? sourceProfile.armorRating : derivedArmor
+    const derivedMove = `${dragonbaneMovementMeters(mv)} m (per turn)`
+    const movement = sameSystem && sourceProfile.movement ? sourceProfile.movement : derivedMove
+    const size = dragonbaneSize(hd, kind, sourceProfile.size)
+    const skillsOverride = String(overrides.stats || m.statsOverride || '').trim()
+    const pastedSkills = String(sourceProfile.skills || '').trim()
+    const sameSystemSkills = pastedSkills || (sameSystem ? String(m.stats || '').trim() : '')
+    const skills = skillsOverride || sameSystemSkills || `Evade ${DRAGONBANE_EVADE}`
+    const targetHp = finiteNumber(overrides.hp) ?? exactHp ?? dragonbaneHitPoints(hd)
+    const mark = (value: string, derived: boolean) =>
+      !sameSystem && derived ? `${value} · estimated` : value
+    const traitBlob = T.map((trait) => `${trait.h} ${trait.d}`).join(' ').toLowerCase()
+    const sections = /\b(fear|persuas|darkness|darkvision)\b/.test(traitBlob)
+      ? T
+      : [
+          ...T,
+          {
+            h: 'Monster nature',
+            d: 'Sees in darkness. Immune to fear and Persuasion unless a trait says otherwise.',
+          },
+        ]
+
+    badge = 'Dragonbane'
+    rows = [
+      {
+        k: 'Ferocity',
+        v: mark(String(ferocity), !(sameSystem && sourceProfile.ferocity !== undefined)),
+      },
+      { k: 'Size', v: mark(size, !recognizedDragonbaneSize(sourceProfile.size)) },
+      { k: 'Movement', v: mark(movement, !(sameSystem && sourceProfile.movement)) },
+      {
+        k: 'Armor Rating',
+        v: mark(String(armor), !(sameSystem && sourceProfile.armorRating !== undefined)),
+      },
+      {
+        k: 'HP',
+        v: mark(String(targetHp), finiteNumber(overrides.hp) === undefined && exactHp === undefined),
+      },
+      { k: 'Skills', v: skills },
+      {
+        k: 'Monster Attacks',
+        v: formatDragonbaneMonsterAttacks(A.map((attack) => ({ name: attack.n, damage: attack.d, note: attack.note }))),
+      },
+    ]
+    return { badge, title: sanitizeCardTitle(m.name), ep: m.ep || '', rows, sections }
   } else {
     const armName =
       targetAc >= 16

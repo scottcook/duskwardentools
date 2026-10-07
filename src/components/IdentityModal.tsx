@@ -44,12 +44,12 @@ export function IdentityModal({ onClose }: { onClose: () => void }) {
       }
     >
       {IS_DEMO ? (
-        <p style={{ margin: 0, lineHeight: 1.55, fontSize: 14.5 }}>
+        <p style={{ margin: 0, lineHeight: 1.55, fontSize: 17 }}>
           Demo mode stores projects and creatures <b>only in this browser</b>. Clearing site data
           erases them. There is no remote vault to reclaim.
         </p>
       ) : (
-        <p style={{ margin: 0, lineHeight: 1.55, fontSize: 14.5 }}>
+        <p style={{ margin: 0, lineHeight: 1.55, fontSize: 17 }}>
           Your projects and library are saved remotely, but they are keyed to this browser's{' '}
           <b>warden's mark</b> — there is no account to sign into. Clearing <b>site data / cookies</b>{' '}
           (not cache alone) generates a new mark and the library will look empty, even though
@@ -65,7 +65,7 @@ export function IdentityModal({ onClose }: { onClose: () => void }) {
         <input
           id="dev-id"
           className="in mn"
-          style={{ fontSize: 12.5 }}
+          style={{ fontSize: 16 }}
           value={value}
           onChange={(e) => setValue(e.target.value)}
           spellCheck={false}
@@ -76,7 +76,7 @@ export function IdentityModal({ onClose }: { onClose: () => void }) {
           Copy current mark
         </button>
         {IS_DEMO && (
-          <span className="dim" style={{ fontSize: 12.5, fontStyle: 'italic' }}>
+          <span className="dim" style={{ fontSize: 15, fontStyle: 'italic' }}>
             Demo mode — data lives only in this browser.
           </span>
         )}

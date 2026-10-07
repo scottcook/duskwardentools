@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { format } from './convert'
+import { entryToForge } from './creatureBridge'
 import {
   extractCreatureName,
   looksLikeFieldLabelLine,
   normalizeStatBlockText,
   parseStatBlock,
 } from './parseStatBlock'
+import type { Entry } from './types'
 
 const NAMELESS_OSR = `Armor Class: -2 [21 or better if using ascending AC]
 Hit Dice: 12+ (roughly 60-96 hp)
@@ -86,5 +88,77 @@ Challenge 1 (200 XP)`)
     expect(result.forge.name.toLowerCase()).toBe('ghoul')
     const block = format('shadowdark', result.forge, result.system)
     expect(block.title.toLowerCase()).toBe('ghoul')
+  })
+})
+
+const ASH_WIGHT = `Ash Wight
+Ferocity: 2
+Size: Average
+Movement: 8 m (per turn)
+Armor Rating: 4
+HP: 22
+Skills: Awareness 12, Evade 14
+Monster Attacks: 1. Chill touch — 1D8 (drain); 2. Grasp — 1D6; 3. Chill touch — 1D8 (drain)
+Life Drain: The touch steals warmth.`
+
+describe('parseStatBlock Dragonbane', () => {
+  it('detects a Dragonbane block and keeps exact values through format', () => {
+    const result = parseStatBlock(ASH_WIGHT)
+    expect(result.system).toBe('dragonbane')
+    expect(result.confidence).toBe('high')
+    expect(result.forge.name).toBe('Ash Wight')
+    expect(result.forge.hd).toBe(6)
+    expect(result.forge.ac).toBe(15)
+    expect(result.forge.speed).toBe(24)
+    expect(result.forge.stats).toBe('Awareness 12, Evade 14')
+    expect(result.forge.atkText.toLowerCase()).toContain('chill touch')
+    expect(result.forge.atkText.toLowerCase()).toContain('grasp')
+    expect(result.forge.atkText.match(/chill touch/gi)).toHaveLength(1)
+    expect(result.forge.sourceProfile).toMatchObject({
+      hp: 22,
+      ferocity: 2,
+      armorRating: 4,
+      skills: 'Awareness 12, Evade 14',
+    })
+
+    const block = format('dragonbane', result.forge, result.system)
+    expect(block.rows.find((row) => row.k === 'Ferocity')?.v).toBe('2')
+    expect(block.rows.find((row) => row.k === 'HP')?.v).toBe('22')
+    expect(block.rows.find((row) => row.k === 'Armor Rating')?.v).toBe('4')
+    expect(block.rows.find((row) => row.k === 'Movement')?.v).toBe('8 m (per turn)')
+    expect(block.rows.find((row) => row.k === 'Skills')?.v).toBe('Awareness 12, Evade 14')
+    expect(block.rows.find((row) => row.k === 'Monster Attacks')?.v).toMatch(/Chill touch — 1D8 \(drain\)/)
+    expect(block.rows.find((row) => row.k === 'Monster Attacks')?.v).toMatch(/Grasp — 1D6/)
+    expect(block.rows.find((row) => row.k === 'Monster Attacks')?.v).toMatch(/Hits automatically/)
+    expect(block.sections.some((section) => section.h === 'Life Drain')).toBe(true)
+  })
+
+  it('does not treat a compact Mörk Borg block as Dragonbane', () => {
+    const result = parseStatBlock(`Grave Rat
+HP 8
+Morale 7
+Armor: -d4
+Attack: bite d6`)
+    expect(result.system).not.toBe('dragonbane')
+  })
+
+  it('reads a saved Dragonbane movement row in meters back into feet', () => {
+    const entry = {
+      id: '1',
+      user_id: 'device',
+      project_id: null,
+      type: 'creature',
+      title: 'Ash Wight',
+      tags: [],
+      source_text: null,
+      parsed_json: { name: 'Ash Wight', system: 'dragonbane' },
+      output_json: {
+        system: 'dragonbane',
+        rows: [{ k: 'Movement', v: '10 m (per turn)' }],
+      },
+      created_at: '',
+      updated_at: '',
+    } satisfies Entry
+    expect(entryToForge(entry).speed).toBe(30)
   })
 })

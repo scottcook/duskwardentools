@@ -42,6 +42,57 @@ describe('format', () => {
     expect(block.rows.find((row) => row.k === 'Attack')?.v).toContain('d4')
     expect(block.rows.find((row) => row.k === 'Attack')?.v).toContain('d6')
   })
+
+  it('still renders Knave from the final format branch', () => {
+    const block = format('knave', BEASTS[0], 'ose')
+    expect(block.badge).toContain('Knave')
+  })
+
+  it('preserves exact Dragonbane source values on same-system output', () => {
+    const forge = {
+      ...BEASTS[0],
+      hd: 6,
+      ac: 15,
+      speed: 24,
+      stats: 'Awareness 12, Evade 14',
+      sourceProfile: {
+        system: 'dragonbane',
+        hp: 22,
+        ferocity: 2,
+        armorRating: 4,
+        size: 'Average',
+        movement: '8 m (per turn)',
+        skills: 'Awareness 12, Evade 14',
+      },
+    }
+    const block = format('dragonbane', forge, 'dragonbane')
+    expect(block.badge).toBe('Dragonbane')
+    expect(block.rows.find((row) => row.k === 'Ferocity')?.v).toBe('2')
+    expect(block.rows.find((row) => row.k === 'Armor Rating')?.v).toBe('4')
+    expect(block.rows.find((row) => row.k === 'HP')?.v).toBe('22')
+    expect(block.rows.find((row) => row.k === 'Movement')?.v).toBe('8 m (per turn)')
+    expect(block.rows.find((row) => row.k === 'Skills')?.v).toBe('Awareness 12, Evade 14')
+    expect(block.rows.find((row) => row.k === 'Size')?.v).toBe('Average')
+    expect(block.rows.map((row) => row.v).join(' ')).not.toMatch(/estimated/)
+  })
+
+  it('estimates Dragonbane from hit dice and ascending AC', () => {
+    const block = format('dragonbane', { ...BEASTS[0], kind: 'undead' }, 'dnd5e')
+    expect(block.rows.find((row) => row.k === 'Ferocity')?.v).toBe('1 · estimated')
+    expect(block.rows.find((row) => row.k === 'Armor Rating')?.v).toBe('2 · estimated')
+    expect(block.rows.find((row) => row.k === 'HP')?.v).toBe('10 · estimated')
+    expect(block.rows.find((row) => row.k === 'Movement')?.v).toBe('10 m (per turn) · estimated')
+    expect(block.rows.find((row) => row.k === 'Skills')?.v).toBe('Evade 15')
+    const attacks = block.rows.find((row) => row.k === 'Monster Attacks')?.v ?? ''
+    expect(attacks).toMatch(/Hits automatically/)
+    expect(attacks).toMatch(/repeated D6/)
+    expect(attacks).not.toMatch(/\+\d/)
+  })
+
+  it('uses a Dragonbane skills override when one is entered', () => {
+    const block = format('dragonbane', { ...BEASTS[0], statsOverride: 'Sneaking 16' }, 'dnd5e')
+    expect(block.rows.find((row) => row.k === 'Skills')?.v).toBe('Sneaking 16')
+  })
 })
 
 describe('parseAttacks', () => {

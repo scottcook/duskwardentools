@@ -7,6 +7,9 @@
  * - OSE Classic Fantasy SRD, Combat Tables and Awarding XP
  * - Pathfinder 2E Remaster GM Core, Building Creatures tables 2-2, 2-5–2-10
  * - Knave 1E, Monsters
+ * - Dragonbane Quickstart monster procedure (ferocity, armor rating, auto-hit
+ *   attacks, Evade 15). Cross-system HP, ferocity, and armor bands below are
+ *   Duskwarden estimates — Dragonbane publishes no HD conversion table.
  */
 
 export type MonsterRole = 'balanced' | 'brute' | 'skirmisher' | 'soldier' | 'spellcaster'
@@ -494,4 +497,132 @@ export function dccCritTable(hd: number, undead = false): string {
 
 export function formatDccSaves(fortitude: number, reflex: number, will: number): string {
   return `Fort ${fortitude >= 0 ? '+' : ''}${fortitude}, Ref ${reflex >= 0 ? '+' : ''}${reflex}, Will ${will >= 0 ? '+' : ''}${will}`
+}
+
+/* ------------------------------------------------------------------------ */
+/* Dragonbane — Quickstart monster procedure + Duskwarden power estimates   */
+/* ------------------------------------------------------------------------ */
+
+/** Published default for monster dodge and parry rolls. */
+export const DRAGONBANE_EVADE = 15
+
+export function dragonbaneHitPoints(hd: number): number {
+  return Math.max(4, Math.round(hd * 4 + 2))
+}
+
+/** 1 below 4 HD, 2 from 4 HD, 3 from 8 HD. Not equal to attack count. */
+export function dragonbaneFerocity(hd: number): number {
+  if (hd >= 8) return 3
+  if (hd >= 4) return 2
+  return 1
+}
+
+/** Ascending AC bands → Dragonbane armor rating (damage reduction). */
+export function dragonbaneArmorFromAc(ascendingAc: number): number {
+  if (ascendingAc >= 18) return 8
+  if (ascendingAc >= 16) return 6
+  if (ascendingAc >= 14) return 4
+  if (ascendingAc >= 12) return 2
+  return 0
+}
+
+/** Inverse of {@link dragonbaneArmorFromAc}, so other systems get ascending AC. */
+export function ascendingAcFromDragonbaneArmor(armorRating: number): number {
+  if (armorRating >= 8) return 19
+  if (armorRating >= 6) return 17
+  if (armorRating >= 4) return 15
+  if (armorRating >= 2) return 13
+  return 10
+}
+
+/** 30 ft → 10 m. Monster movement in Dragonbane is meters per turn. */
+export function dragonbaneMovementMeters(feet: number): number {
+  return Math.max(2, Math.round((Number(feet) || 0) / 3))
+}
+
+export function recognizedDragonbaneSize(sourceSize?: string): string | undefined {
+  if (!sourceSize?.trim()) return undefined
+  const text = sourceSize.trim().toLowerCase()
+  if (/\b(tiny|small)\b/.test(text)) return 'Small'
+  if (/\b(huge|gargantuan|colossal)\b/.test(text)) return 'Huge'
+  if (/\blarge\b/.test(text)) return 'Large'
+  if (/\b(medium|average)\b/.test(text)) return 'Average'
+  const letter = text.match(/^([smlh])\b/)?.[1]
+  if (letter === 's') return 'Small'
+  if (letter === 'h') return 'Huge'
+  if (letter === 'l') return 'Large'
+  if (letter === 'm') return 'Average'
+  return undefined
+}
+
+export function dragonbaneSize(hd: number, kind = '', sourceSize?: string): string {
+  const fromSource = recognizedDragonbaneSize(sourceSize)
+  if (fromSource) return fromSource
+  const text = kind.toLowerCase()
+  if (/\b(tiny|small)\b/.test(text)) return 'Small'
+  if (hd >= 10 || /\b(huge|gargantuan|colossal|dragons?|giants?)\b/.test(text)) return 'Huge'
+  if (hd >= 6 || /\blarge\b/.test(text)) return 'Large'
+  return 'Average'
+}
+
+export function dragonbaneDamageDice(expression: string): string {
+  const cleaned = String(expression || '1d4').trim()
+  const rewritten = cleaned.replace(/(\d*)\s*d\s*(\d+)/gi, (_, count: string, faces: string) => {
+    return `${count}D${faces}`
+  })
+  return rewritten || '1D4'
+}
+
+/** Only when the attack name itself names the damage type or a clear weapon. */
+export function dragonbaneDamageType(name: string): 'slashing' | 'piercing' | 'bludgeoning' | '' {
+  const text = name.toLowerCase()
+  if (
+    /\b(bites?|fangs?|stings?|beaks?|horns?|spears?|arrows?|bolts?|rapiers?|daggers?|knives|knife|pierc(?:e|ing))\b/.test(
+      text,
+    )
+  ) {
+    return 'piercing'
+  }
+  if (/\b(claws?|slashes?|slash(?:ing)?|swords?|axes?|scythes?|blades?)\b/.test(text)) return 'slashing'
+  if (/\b(bludgeon(?:ing)?|hammers?|maces?|clubs?|fists?|slams?|smashes?|hooves|hoof|tails?)\b/.test(text)) {
+    return 'bludgeoning'
+  }
+  return ''
+}
+
+export interface DragonbaneAttackInput {
+  name: string
+  damage: string
+  note?: string
+}
+
+function dragonbaneAttackLine(attack: DragonbaneAttackInput): string {
+  const name = attack.name.trim() || 'Strike'
+  const rawNote = (attack.note || '').trim()
+  const typeInNote = rawNote.match(/\b(piercing|slashing|bludgeoning)\b/i)?.[1]?.toLowerCase() as
+    | 'slashing'
+    | 'piercing'
+    | 'bludgeoning'
+    | undefined
+  const type = typeInNote || dragonbaneDamageType(name)
+  const note = rawNote
+    .replace(/\b(piercing|slashing|bludgeoning)\b/gi, '')
+    .replace(/\s+,/g, ',')
+    .replace(/,\s*,/g, ',')
+    .replace(/^[\s,]+|[\s,]+$/g, '')
+    .trim()
+  const dice = dragonbaneDamageDice(attack.damage)
+  return `${name} — ${[dice, type].filter(Boolean).join(' ')}${note ? ` (${note})` : ''}`
+}
+
+/**
+ * One attack stays a single auto-hit line. Two or more fill a 1–6 list by
+ * cycling, matching the D6 monster-attack procedure.
+ */
+export function formatDragonbaneMonsterAttacks(attacks: DragonbaneAttackInput[]): string {
+  const rendered = attacks.map(dragonbaneAttackLine).filter((line) => line.trim())
+  if (rendered.length === 0) return 'Strike — 1D4. Hits automatically.'
+  if (rendered.length === 1) return `${rendered[0]}. Hits automatically.`
+  const table = Array.from({ length: 6 }, (_, index) => `${index + 1}. ${rendered[index % rendered.length]}`)
+  return `${table.join('; ')}. Hits automatically. A repeated D6 result advances to the next attack; 6 wraps to 1.`
 }

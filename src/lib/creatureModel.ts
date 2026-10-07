@@ -59,10 +59,12 @@ export function statChips(e: Entry): StatChip[] {
   if (rows.length > 0) {
     const specs: Array<{ labels: string[]; short: string }> = [
       { labels: ['ac', 'armor class', 'armor'], short: 'AC' },
+      { labels: ['armor rating'], short: 'AR' },
       { labels: ['hp', 'hit points'], short: 'HP' },
       { labels: ['hd', 'hit dice'], short: 'HD' },
       { labels: ['lv', 'level'], short: 'LV' },
-      { labels: ['mv', 'move', 'speed'], short: 'MV' },
+      { labels: ['ferocity'], short: 'Fer' },
+      { labels: ['mv', 'move', 'speed', 'movement'], short: 'MV' },
       { labels: ['ml', 'morale'], short: 'ML' },
     ]
     return specs.flatMap(({ labels, short }) => {
@@ -106,7 +108,7 @@ export function creatureActions(e: Entry): CreatureAction[] {
 
 export function attacksSummary(e: Entry): string {
   const outputAttack = convertedRows(e).find((row) =>
-    ['actions', 'att', 'atk', 'attack', 'strikes', 'damage/attack'].includes(row.k.toLowerCase()),
+    ['actions', 'att', 'atk', 'attack', 'strikes', 'damage/attack', 'monster attacks'].includes(row.k.toLowerCase()),
   )
   if (outputAttack) return outputAttack.v
   return creatureAttacks(e)

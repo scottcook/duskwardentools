@@ -81,7 +81,7 @@ export function CreatureDetailModal({ entry, onClose, footer }: {
           </button>
         </div>
       )}
-      <article className="sheet" style={{ transform: 'none', boxShadow: '3px 4px 0 #000' }}>
+      <article className="sheet" style={{ transform: 'none', boxShadow: '3px 4px 0 var(--sheet-shadow)' }}>
         <div className="sysb">{systemLabel(displaySystem || creatureSystem(entry))}</div>
         <h3 className="mname">{displayName}</h3>
         {displayEp && <p className="mep">{displayEp}</p>}

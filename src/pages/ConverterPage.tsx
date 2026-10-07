@@ -132,7 +132,6 @@ export function ConverterPage() {
   const [sel, setSel] = useState(0)
 
   const [rolling, setRolling] = useState(false)
-  const [face, setFace] = useState(20)
   const [flip, setFlip] = useState(false)
   const [copied, setCopied] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -171,13 +170,11 @@ export function ConverterPage() {
   const [tomeError, setTomeError] = useState('')
   const [tomeBusySlug, setTomeBusySlug] = useState<string | null>(null)
 
-  const iv = useRef<ReturnType<typeof setInterval> | null>(null)
   const to = useRef<ReturnType<typeof setTimeout> | null>(null)
   const ct = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     return () => {
-      if (iv.current) clearInterval(iv.current)
       if (to.current) clearTimeout(to.current)
       if (ct.current) clearTimeout(ct.current)
       if (scribeDebounce.current) clearTimeout(scribeDebounce.current)
@@ -362,11 +359,8 @@ export function ConverterPage() {
         fields: sourceFieldsForStorage(knownSourceFields),
       }
       setRolling(true)
-      iv.current = setInterval(() => setFace(1 + Math.floor(Math.random() * 20)), 75)
       to.current = setTimeout(() => {
-        if (iv.current) clearInterval(iv.current)
         setRolling(false)
-        setFace(20)
         setCm(snapshot)
         setConvertedSource(sourceSnapshot)
         setTgtDone(target)
@@ -545,7 +539,7 @@ export function ConverterPage() {
         <div>
           <h2 className="pagetitle">The Converter</h2>
           <p className="pagesub">
-            Edit a beast in the neutral tongue, then transmute it into any of eight systems.
+            Edit a beast in the neutral tongue, then transmute it into any of nine systems.
           </p>
         </div>
         <div className="pagehead-actions">
@@ -789,10 +783,12 @@ export function ConverterPage() {
                     placeholder="Not present in source"
                   />
                 </div>
-                {(tgt === 'dnd5e' || tgt === 'shadowdark' || m.statsOverride) && (
+                {(tgt === 'dnd5e' || tgt === 'shadowdark' || tgt === 'dragonbane' || m.statsOverride) && (
                   <div className={'fld fw' + fieldTone('statsOverride')}>
                     <label className="flbl" htmlFor="f-stats-override">
-                      {CONVERTER_SYSTEMS.find((system) => system.value === tgt)?.label} stats override
+                      {tgt === 'dragonbane'
+                        ? 'Dragonbane skills override'
+                        : `${CONVERTER_SYSTEMS.find((system) => system.value === tgt)?.label} stats override`}
                     </label>
                     <input
                       className="in"
@@ -800,7 +796,11 @@ export function ConverterPage() {
                       name="statsOverride"
                       value={m.statsOverride ?? ''}
                       onChange={onField}
-                      placeholder="Optional — leave blank to use translated or derived stats"
+                      placeholder={
+                        tgt === 'dragonbane'
+                          ? 'Optional — leave blank to use Evade 15 or source skills'
+                          : 'Optional — leave blank to use translated or derived stats'
+                      }
                     />
                   </div>
                 )}
@@ -950,7 +950,6 @@ export function ConverterPage() {
           <div className="cbar">
             <div className="diebox" aria-hidden="true">
               <D20Die rolling={rolling} />
-              <span className="dienum">{face}</span>
             </div>
             <button
               className="go"

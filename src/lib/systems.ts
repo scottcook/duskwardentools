@@ -22,6 +22,7 @@ export const SYSTEM_LABELS: Record<string, string> = {
   morkborg: 'Mörk Borg',
   pf2e: 'Pathfinder 2E',
   knave: 'Knave',
+  dragonbane: 'Dragonbane',
 }
 
 export function systemLabel(code?: string | null): string {
@@ -39,6 +40,7 @@ export const CONVERTER_SYSTEMS: { value: string; label: string }[] = [
   { value: 'morkborg', label: 'Mörk Borg' },
   { value: 'pf2e', label: 'Pathfinder 2E' },
   { value: 'knave', label: 'Knave' },
+  { value: 'dragonbane', label: 'Dragonbane' },
 ]
 
 /**

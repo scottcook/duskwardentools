@@ -12,16 +12,64 @@ function showFeedback() {
   window.dispatchEvent(new CustomEvent('duskwarden-show-feedback'))
 }
 
+function SunIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+      <circle cx="12" cy="12" r="4" />
+      <path
+        strokeLinecap="round"
+        d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4"
+      />
+    </svg>
+  )
+}
+
+function MoonIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M20 14.5A7.5 7.5 0 1 1 9.5 4 6 6 0 0 0 20 14.5z"
+      />
+    </svg>
+  )
+}
+
 const NAV = [
   { to: '/convert', label: 'Converter', end: false },
   { to: '/projects', label: 'Projects', end: false },
   { to: '/library', label: 'Library', end: false },
 ]
 
+type Theme = 'light' | 'dark'
+
+const THEME_KEY = 'duskwarden-theme'
+
+function readTheme(): Theme {
+  return document.documentElement.dataset.theme === 'light' ? 'light' : 'dark'
+}
+
+function applyTheme(theme: Theme) {
+  document.documentElement.dataset.theme = theme
+  localStorage.setItem(THEME_KEY, theme)
+  document.querySelector('meta[name="theme-color"]')?.setAttribute(
+    'content',
+    theme === 'light' ? '#f4efe6' : '#0b0908',
+  )
+}
+
 export function Layout({ children }: { children: ReactNode }) {
   const [identity, setIdentity] = useState(false)
   const [navOpen, setNavOpen] = useState(false)
+  const [theme, setTheme] = useState<Theme>(readTheme)
   const location = useLocation()
+
+  function toggleTheme() {
+    const next: Theme = theme === 'light' ? 'dark' : 'light'
+    applyTheme(next)
+    setTheme(next)
+  }
 
   useEffect(() => {
     setNavOpen(false)
@@ -66,6 +114,15 @@ export function Layout({ children }: { children: ReactNode }) {
               </p>
             </div>
             <div className="top-end">
+              <button
+                type="button"
+                className="theme-toggle"
+                aria-pressed={theme === 'light'}
+                aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+                onClick={toggleTheme}
+              >
+                {theme === 'light' ? <MoonIcon /> : <SunIcon />}
+              </button>
               <div className="meta">
                 Eight tongues spoken
                 <br />

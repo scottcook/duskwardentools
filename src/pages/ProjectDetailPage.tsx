@@ -100,7 +100,7 @@ export function ProjectDetailPage() {
   return (
     <>
       <p style={{ margin: '24px 0 0' }}>
-        <Link className="mn" to="/projects" style={{ fontSize: 12, letterSpacing: 1 }}>
+        <Link to="/projects" style={{ fontSize: 15, fontFamily: 'var(--font-ui)', fontWeight: 600 }}>
           ← All projects
         </Link>
       </p>

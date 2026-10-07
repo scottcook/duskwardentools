@@ -76,7 +76,7 @@ export function AddToProjectMenu({
       {open && (
         <div className="dropdown-menu" role="menu">
           {projects.length === 0 && (
-            <div className="dim" style={{ padding: '10px 12px', fontSize: 13, fontStyle: 'italic' }}>
+            <div className="dim" style={{ padding: '10px 12px', fontSize: 15, fontStyle: 'italic' }}>
               No projects yet.
             </div>
           )}
@@ -144,7 +144,7 @@ function menuRowStyle(active: boolean): React.CSSProperties {
     border: 0,
     color: active ? 'var(--dim)' : 'var(--text)',
     font: 'inherit',
-    fontSize: 14,
+    fontSize: 15,
     padding: '9px 12px',
     cursor: active ? 'default' : 'pointer',
   }

@@ -171,7 +171,7 @@ export function LibraryPage() {
           <p className="pagesub">
             Every horror you've saved. Search the bestiary, then bind one to a project.
           </p>
-          <p className="vault-status mn dim" role="status">
+          <p className="vault-status dim" role="status">
             {IS_DEMO
               ? 'Local only · this browser · clearing site data erases the library'
               : 'Vault · saved remotely · mark on this browser'}

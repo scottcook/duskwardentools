@@ -24,6 +24,12 @@ function firstInt(s: string, fallback: number): number {
   return m ? parseInt(m[0], 10) : fallback
 }
 
+function feetFromMovement(raw: string, fallback = 30): number {
+  const n = firstInt(raw, fallback)
+  if (/\b(?:m|meters?|metres?)\b/i.test(raw)) return Math.max(2, n * 3)
+  return n
+}
+
 function rowValue(rows: OutputStatRow[] | undefined, labels: string[]): string {
   const wanted = labels.map((label) => label.toLowerCase())
   return (
@@ -147,7 +153,7 @@ export function forgeToNewCreature(
     ac: ascendingAcFromOutput(block.rows, tgtSystem) ?? (+m.ac || undefined),
     hp: firstNumber(rowValue(block.rows, ['HP', 'Hit Points'])),
     morale: firstNumber(rowValue(block.rows, ['ML', 'Morale'])),
-    movement: rowValue(block.rows, ['MV', 'Move', 'Speed']) || undefined,
+    movement: rowValue(block.rows, ['MV', 'Move', 'Speed', 'Movement']) || undefined,
     saves: rowValue(block.rows, ['SV', 'Saves', 'Saving Throws']) || undefined,
     attacks,
     specialActions,
@@ -242,7 +248,7 @@ export function entryToForge(e: Entry): ForgeMonster {
   const al = alRaw.startsWith('L') ? 'L' : alRaw.startsWith('C') ? 'C' : 'N'
   const outputAc = rowValue(rows, ['AC', 'Armor Class'])
   const bracketAc = outputAc.match(/\[(\d+)\]/)?.[1]
-  const outputSpeed = rowValue(rows, ['MV', 'Move', 'Speed'])
+  const outputSpeed = rowValue(rows, ['MV', 'Move', 'Speed', 'Movement'])
   const restoredProfile: ForgeSourceProfile | undefined = storedProfile
     ? {
         ...storedProfile,
@@ -265,9 +271,9 @@ export function entryToForge(e: Entry): ForgeMonster {
     hd: hitDiceNotation || hdValue,
     ac: Number(p.ac) || Number(bracketAc) || ascendingAcFromOutput(rows, srcSystem) || 12,
     speed: p.movement
-      ? firstInt(String(p.movement), 30)
+      ? feetFromMovement(String(p.movement), 30)
       : outputSpeed
-        ? firstInt(outputSpeed, 30)
+        ? feetFromMovement(outputSpeed, 30)
         : 30,
     ml: Number(p.morale) || Number(o.morale) || 8,
     al,

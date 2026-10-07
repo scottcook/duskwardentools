@@ -46,7 +46,7 @@ export function MarkBackupModal({ onClose }: { onClose: () => void }) {
         </>
       }
     >
-      <p style={{ margin: 0, lineHeight: 1.55, fontSize: 14.5 }}>
+      <p style={{ margin: 0, lineHeight: 1.55, fontSize: 17 }}>
         Your library is saved remotely, but it is keyed to <b>this browser's mark</b> — there is no
         account to sign into. If you clear site data or switch browsers, the library will look empty
         until you restore this mark.
@@ -58,7 +58,7 @@ export function MarkBackupModal({ onClose }: { onClose: () => void }) {
         <input
           id="mark-backup-id"
           className="in mn"
-          style={{ fontSize: 12.5 }}
+          style={{ fontSize: 16 }}
           value={mark}
           readOnly
           spellCheck={false}

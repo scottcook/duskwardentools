@@ -1,9 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import {
   averageHitPoints,
+  ascendingAcFromDragonbaneArmor,
   dccCombatStats,
   dccCritTable,
+  dragonbaneArmorFromAc,
+  dragonbaneFerocity,
+  dragonbaneHitPoints,
+  dragonbaneMovementMeters,
+  dragonbaneSize,
   formatDccSaves,
+  formatDragonbaneMonsterAttacks,
   knaveHitPoints,
   morkBorgDamage,
   oseAttack,
@@ -91,5 +98,59 @@ describe('PF2E benchmarks', () => {
     expect(row.level).toBe(3)
     expect(row.ac).toBe(18)
     expect(row.hp).toBe(45)
+  })
+})
+
+describe('Dragonbane estimates', () => {
+  it('scales hit points on a Constitution-like curve', () => {
+    expect(dragonbaneHitPoints(1)).toBe(6)
+    expect(dragonbaneHitPoints(2)).toBe(10)
+    expect(dragonbaneHitPoints(4)).toBe(18)
+    expect(dragonbaneHitPoints(8)).toBe(34)
+  })
+
+  it('bands ferocity by hit dice, not attack count', () => {
+    expect(dragonbaneFerocity(3)).toBe(1)
+    expect(dragonbaneFerocity(4)).toBe(2)
+    expect(dragonbaneFerocity(8)).toBe(3)
+  })
+
+  it('maps ascending AC to armor rating and back', () => {
+    expect(dragonbaneArmorFromAc(11)).toBe(0)
+    expect(dragonbaneArmorFromAc(12)).toBe(2)
+    expect(dragonbaneArmorFromAc(15)).toBe(4)
+    expect(dragonbaneArmorFromAc(17)).toBe(6)
+    expect(dragonbaneArmorFromAc(18)).toBe(8)
+    expect(ascendingAcFromDragonbaneArmor(0)).toBe(10)
+    expect(ascendingAcFromDragonbaneArmor(4)).toBe(15)
+    expect(ascendingAcFromDragonbaneArmor(8)).toBe(19)
+  })
+
+  it('converts feet to meters per turn', () => {
+    expect(dragonbaneMovementMeters(30)).toBe(10)
+    expect(dragonbaneMovementMeters(0)).toBe(2)
+  })
+
+  it('uses source size, then kind and hit dice', () => {
+    expect(dragonbaneSize(2, 'undead', 'S')).toBe('Small')
+    expect(dragonbaneSize(2, 'dragon')).toBe('Huge')
+    expect(dragonbaneSize(6, 'beast')).toBe('Large')
+    expect(dragonbaneSize(2, 'undead')).toBe('Average')
+  })
+
+  it('builds an auto-hit D6 list without repeating a two-attack set as six unique attacks', () => {
+    const table = formatDragonbaneMonsterAttacks([
+      { name: '2 Claws', damage: '1d4', note: 'paralysis' },
+      { name: 'Bite', damage: '1d6' },
+    ])
+    expect(table).toContain('1. 2 Claws — 1D4 slashing (paralysis)')
+    expect(table).toContain('2. Bite — 1D6 piercing')
+    expect(table).toContain('6. Bite — 1D6 piercing')
+    expect(table).toMatch(/Hits automatically/)
+    expect(table).toMatch(/repeated D6 result advances/)
+
+    expect(formatDragonbaneMonsterAttacks([{ name: 'Bite', damage: '1d6', note: 'grave-rot' }])).toBe(
+      'Bite — 1D6 piercing (grave-rot). Hits automatically.',
+    )
   })
 })

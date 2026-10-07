@@ -6,7 +6,7 @@
  */
 
 import type { ForgeMonster, ForgeSourceProfile } from './convert'
-import { averageHitPoints, parseHitDice } from './systemRules'
+import { ascendingAcFromDragonbaneArmor, averageHitPoints, parseHitDice } from './systemRules'
 
 export type ParseConfidence = 'high' | 'medium' | 'low' | 'none'
 
@@ -27,6 +27,7 @@ const SYSTEMS = [
   'morkborg',
   'pf2e',
   'knave',
+  'dragonbane',
   'bfrpg',
   'osric',
 ] as const
@@ -114,6 +115,10 @@ function scoreSystem(text: string): DetectScore[] {
   if (/\batk\s*:\s*.*\+\d+\s*\(\d+d/i.test(text) && /\bml\s*\d+/i.test(text)) bump('knave', 3, 'Knave atk bonus')
   if (/\bas\s+(?:no armor|gambeson|chain|plate)\b/i.test(text)) bump('knave', 4, 'Knave armor tier')
 
+  if (/\bferocity\s*:/i.test(text)) bump('dragonbane', 6, 'Ferocity')
+  if (/\bmonster attacks?\s*:/i.test(text)) bump('dragonbane', 4, 'Monster Attacks')
+  if (/\barmor rating\s*:/i.test(text)) bump('dragonbane', 3, 'Armor Rating')
+
   if (/\bsave as\s*:/i.test(text) && /\bno\.\s*of\s*attacks\s*:/i.test(text)) {
     bump('bfrpg', 6, 'Basic Fantasy monster fields')
   }
@@ -151,7 +156,7 @@ export function detectSourceSystem(text: string): { system: string; confidence: 
 
 /** Labels that start a field line in common OSR / 5E / SD paste formats. */
 const NEXT_FIELD_LABEL =
-  /\s+(?=(?:Armor Class|Hit Dice|Hit Points|No\.\s*(?:of\s*)?Attacks|Damage\/Attack|Special Attacks?|Special Defenses?|Magic Resistance|Psionic Ability|No\.\s*(?:Appearing|Encountered)|%\s*in\s*Lair|Lair Probability|Treasure(?:\s+Type)?|Intelligence|Frequency|Alignment|Morale|Move|Attacks?|Damage|Speed|Challenge|THAC0|Save As|Saves?|XP|Level|AC|HD|HP|MV|ATT|ATK|ML|AL|SV|SP|Init|Act|Crit|LV)\s*:)/gi
+  /\s+(?=(?:Armor Class|Hit Dice|Hit Points|No\.\s*(?:of\s*)?Attacks|Damage\/Attack|Special Attacks?|Special Defenses?|Magic Resistance|Psionic Ability|No\.\s*(?:Appearing|Encountered)|%\s*in\s*Lair|Lair Probability|Treasure(?:\s+Type)?|Intelligence|Frequency|Alignment|Morale|Movement|Move|Attacks?|Damage|Speed|Challenge|THAC0|Save As|Saves?|XP|Level|Ferocity|Size|Armor Rating|Skills|Monster Attacks|AC|HD|HP|MV|ATT|ATK|ML|AL|SV|SP|Init|Act|Crit|LV)\s*:)/gi
 
 const NAME_MAX_LEN = 80
 
@@ -195,7 +200,7 @@ export function looksLikeFieldLabelLine(line: string): boolean {
   const t = line.trim()
   if (!t) return true
   if (
-    /^(?:Armor Class|Hit Dice|Hit Points|No\.\s*(?:of\s*)?Attacks|Damage\/Attack|Special Attacks?|Special Defenses?|Magic Resistance|Psionic Ability|No\.\s*(?:Appearing|Encountered)|%\s*in\s*Lair|Lair Probability|Treasure(?:\s+Type)?|Intelligence|Frequency|Alignment|Morale|Move|Attacks?|Damage|Speed|Challenge|THAC0|Save As|Saves?|XP|Level|AC|HD|HP|MV|ATT|ATK|ML|AL|SV|SP|Init|Act|Crit|LV)\s*:/i.test(
+    /^(?:Armor Class|Hit Dice|Hit Points|No\.\s*(?:of\s*)?Attacks|Damage\/Attack|Special Attacks?|Special Defenses?|Magic Resistance|Psionic Ability|No\.\s*(?:Appearing|Encountered)|%\s*in\s*Lair|Lair Probability|Treasure(?:\s+Type)?|Intelligence|Frequency|Alignment|Morale|Movement|Move|Attacks?|Damage|Speed|Challenge|THAC0|Save As|Saves?|XP|Level|Ferocity|Size|Armor Rating|Skills|Monster Attacks|AC|HD|HP|MV|ATT|ATK|ML|AL|SV|SP|Init|Act|Crit|LV)\s*:/i.test(
       t,
     )
   ) {
@@ -997,6 +1002,110 @@ function parseKnave(text: string): { forge: Partial<ForgeMonster>; fieldsFound: 
   }
 }
 
+function monsterAttackSource(text: string): string {
+  const lines = text.split('\n')
+  const start = lines.findIndex((line) => /^\s*monster attacks?\s*:/i.test(line))
+  if (start < 0) return ''
+  const collected = [lines[start].replace(/^\s*monster attacks?\s*:?\s*/i, '').trim()]
+  for (const line of lines.slice(start + 1)) {
+    const trimmed = line.trim()
+    if (!trimmed) break
+    if (/^(?:ferocity|size|movement|armor rating|hp|skills|monster attacks)\s*:/i.test(trimmed)) break
+    if (/^[A-Za-z][A-Za-z .'-]+:\s+\S/.test(trimmed) && !/^\d+\./.test(trimmed)) break
+    collected.push(trimmed)
+  }
+  return collected.filter(Boolean).join('; ')
+}
+
+/** Collapse a D6 attack list to unique forge attacks: "Name NdN (note)". */
+function dragonbaneAttacksToForge(raw: string): string {
+  const withoutProcedure = raw
+    .replace(/\.?\s*Hits automatically[\s\S]*$/i, '')
+    .replace(/\.?\s*A repeated D6 result[\s\S]*$/i, '')
+  const chunks = withoutProcedure
+    .split(/\s*;\s*|\n+|(?<=\S)\s+(?=\d+\.\s)/)
+    .map((chunk) => chunk.replace(/^\d+\.\s*/, '').replace(/[—–]/g, ' ').trim())
+    .filter((chunk) => chunk && !/^hits automatically/i.test(chunk))
+
+  const seen = new Set<string>()
+  const unique: string[] = []
+  for (const chunk of chunks) {
+    let normalized = normalizeAttacks(chunk).replace(/(\d+)d(\d+)/gi, (_, count, faces) => `${count}d${faces}`)
+    const typeWord = chunk.match(/\b(piercing|slashing|bludgeoning)\b/i)?.[1]?.toLowerCase()
+    if (typeWord && !normalized.toLowerCase().includes(typeWord)) {
+      normalized = /\([^)]*\)$/.test(normalized)
+        ? normalized.replace(/\)\s*$/, `, ${typeWord})`)
+        : `${normalized} (${typeWord})`
+    }
+    const key = normalized.toLowerCase().replace(/\s+/g, ' ')
+    if (!key || seen.has(key)) continue
+    seen.add(key)
+    unique.push(normalized)
+  }
+  return unique.length ? unique.join('; ') : DEFAULT_FORGE.atkText
+}
+
+function parseDragonbane(text: string): { forge: Partial<ForgeMonster>; fieldsFound: string[]; warnings: string[] } {
+  const fields: string[] = []
+  const name = extractCreatureName(text)
+  if (name) fields.push('name')
+
+  const ferocityRaw = lineValue(text, /ferocity\s*:?\s*(\d+)/i)
+  const ferocity = ferocityRaw ? Number(ferocityRaw) : undefined
+  const sizeRaw = lineValue(text, /\bsize\s*:?\s*([^\n]+)/i)
+  const moveRaw = lineValue(text, /\bmovement\s*:?\s*([^\n]+)/i)
+  const armorRaw = lineValue(text, /armor rating\s*:?\s*([^\n]+)/i)
+  const hpRaw = lineValue(text, /\bhp\s*:?\s*(\d+)/i)
+  const skillsRaw = lineValue(text, /\bskills?\s*:?\s*([^\n]+)/i)
+  const attacksRaw = monsterAttackSource(text)
+
+  const hp = hpRaw ? Number(hpRaw) : undefined
+  const armorRating = armorRaw ? firstNumber(armorRaw) : undefined
+  const meters = moveRaw ? firstNumber(moveRaw) : undefined
+  const speed = meters !== undefined ? Math.max(2, meters * 3) : DEFAULT_FORGE.speed
+  const hd = hp !== undefined ? Math.max(1, Math.round(hp / 4)) : DEFAULT_FORGE.hd
+  const ac =
+    armorRating !== undefined ? ascendingAcFromDragonbaneArmor(armorRating) : DEFAULT_FORGE.ac
+  const atkText = attacksRaw ? dragonbaneAttacksToForge(attacksRaw) : DEFAULT_FORGE.atkText
+
+  if (hpRaw) fields.push('hd')
+  if (armorRaw) fields.push('ac')
+  if (moveRaw) fields.push('speed')
+  if (attacksRaw) fields.push('attacks')
+  if (skillsRaw) fields.push('stats')
+
+  const traitsText = collectTraits(text, [
+    /^(?:Ferocity|Size|Movement|Armor Rating|HP|Skills|Monster Attacks)\b/i,
+  ])
+
+  return {
+    forge: {
+      name,
+      ep: '',
+      hd,
+      ac,
+      speed,
+      ml: DEFAULT_FORGE.ml,
+      al: DEFAULT_FORGE.al,
+      kind: 'monster',
+      stats: skillsRaw || undefined,
+      atkText,
+      traitsText,
+      sourceProfile: sourceProfile('dragonbane', {
+        hp,
+        ferocity,
+        armorRating,
+        size: sizeRaw || undefined,
+        movement: moveRaw || undefined,
+        skills: skillsRaw || undefined,
+        hitDice: hp !== undefined ? String(hd) : undefined,
+      }),
+    },
+    fieldsFound: fields,
+    warnings: [],
+  }
+}
+
 const PARSERS: Record<SystemId, (text: string) => ReturnType<typeof parse5e>> = {
   dnd5e: parse5e,
   ose: parseOse,
@@ -1006,6 +1115,7 @@ const PARSERS: Record<SystemId, (text: string) => ReturnType<typeof parse5e>> = 
   morkborg: parseMorkborg,
   pf2e: parsePf2e,
   knave: parseKnave,
+  dragonbane: parseDragonbane,
   bfrpg: parseOse,
   osric: parseAdd1,
 }
@@ -1125,6 +1235,7 @@ export function systemLabelForParse(code: string): string {
     morkborg: 'Mörk Borg',
     pf2e: 'Pathfinder 2E',
     knave: 'Knave',
+    dragonbane: 'Dragonbane',
   }
   return labels[code] ?? code
 }
