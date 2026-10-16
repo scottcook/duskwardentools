@@ -41,6 +41,15 @@ describe('extractCreatureName', () => {
   it('keeps a normal leading creature name', () => {
     expect(extractCreatureName('Ghoul\nArmor Class 12\nHit Dice 2')).toBe('Ghoul')
   })
+
+  it('skips leading page numbers or chapter headers to find the creature name', () => {
+    expect(
+      extractCreatureName('42\nGHOUL\nMedium undead, chaotic evil\nArmor Class 12'),
+    ).toBe('GHOUL')
+    expect(
+      extractCreatureName('Chapter 4\nGOBLIN WARRIOR CREATURE 1\nAC 16'),
+    ).toBe('GOBLIN WARRIOR')
+  })
 })
 
 describe('parseStatBlock nameless OSR paste', () => {
@@ -160,5 +169,28 @@ Attack: bite d6`)
       updated_at: '',
     } satisfies Entry
     expect(entryToForge(entry).speed).toBe(30)
+  })
+})
+
+describe('parseStatBlock OCR resilience', () => {
+  it('estimates HD when 5E Hit Points line lacks a parenthetical dice expression and parses 2-row ability tables', () => {
+    const result = parseStatBlock(`Ogre
+Large giant, chaotic evil
+Armor Class 11 (hide armor)
+Hit Points 59
+Speed 40 ft.
+STR DEX CON INT WIS CHA
+19 (+4) 8 (-1) 16 (+3) 5 (-3) 7 (-2) 7 (-2)
+Actions
+Greatclub. Melee Weapon Attack: +6 to hit, reach 5 ft., one target. Hit: 13 (2d8 + 4) bludgeoning damage.
+Challenge 2 (450 XP)`)
+
+    expect(result.system).toBe('dnd5e')
+    expect(result.forge.name).toBe('Ogre')
+    expect(result.forge.ac).toBe(11)
+    expect(result.fieldsFound).toContain('hd')
+    expect(result.fieldsFound).toContain('stats')
+    expect(result.forge.stats).toContain('STR 19 (+4)')
+    expect(result.forge.atkText).toContain('Greatclub 2d8+4')
   })
 })

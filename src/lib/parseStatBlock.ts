@@ -80,10 +80,13 @@ function scoreSystem(text: string): DetectScore[] {
   if (/\bactions?\s*:/i.test(text)) bump('dnd5e', 2, 'actions section')
 
   if (/\bthac0\b/i.test(text)) bump('ose', 5, 'THAC0')
-  if (/\bac\s*\d+\s*\[\d+\]/i.test(text)) bump('ose', 4, 'AC bracket notation')
-  if (/\bsv\s+d\d+/i.test(text) || /\bd\d+\s+w\d+\s+p\d+/i.test(text)) bump('ose', 3, 'B/X saves')
-  if (/\bhd\s*\d+\*?\b/i.test(text) && !/\bhit points\b/i.test(text)) bump('ose', 1, 'HD line')
-  if (/\bxp\s*\d+/i.test(text) && /\bml\b/i.test(text)) bump('ose', 2, 'XP + ML')
+  if (/\bac\s*:?\s*-?\d+\s*\[\d+\]/i.test(text)) bump('ose', 4, 'AC bracket notation')
+  if (/\bsv\s*:?\s*d\d+/i.test(text) || /\bd\d+\s+w\d+\s+p\d+/i.test(text)) bump('ose', 3, 'B/X saves')
+  if (/\bhd\s*:?\s*\d+\*?\b/i.test(text) && !/\bhit points\b/i.test(text)) bump('ose', 1, 'HD line')
+  if (/\batt\s*:?\s*\S/i.test(text) && /\bmv\s*:?\s*\d/i.test(text) && /\bml\s*:?\s*\d+/i.test(text)) {
+    bump('ose', 3, 'OSE stat lines')
+  }
+  if (/\bxp\s*:?\s*\d+/i.test(text) && /\bml\b/i.test(text)) bump('ose', 2, 'XP + ML')
 
   if (/%\s*in\s+lair/i.test(text)) bump('add1', 5, '% in Lair')
   if (/\bno\.\s*appearing\b/i.test(text)) bump('add1', 4, 'No. Appearing')
@@ -200,27 +203,80 @@ export function looksLikeFieldLabelLine(line: string): boolean {
   const t = line.trim()
   if (!t) return true
   if (
-    /^(?:Armor Class|Hit Dice|Hit Points|No\.\s*(?:of\s*)?Attacks|Damage\/Attack|Special Attacks?|Special Defenses?|Magic Resistance|Psionic Ability|No\.\s*(?:Appearing|Encountered)|%\s*in\s*Lair|Lair Probability|Treasure(?:\s+Type)?|Intelligence|Frequency|Alignment|Morale|Movement|Move|Attacks?|Damage|Speed|Challenge|THAC0|Save As|Saves?|XP|Level|Ferocity|Size|Armor Rating|Skills|Monster Attacks|AC|HD|HP|MV|ATT|ATK|ML|AL|SV|SP|Init|Act|Crit|LV)\s*:/i.test(
+    /^(?:Armor Class|Hit Dice|Hit Points|No\.\s*(?:of\s*)?Attacks|Damage\/Attack|Special Attacks?|Special Defenses?|Magic Resistance|Psionic Ability|No\.\s*(?:Appearing|Encountered)|%\s*in\s*Lair|Lair Probability|Treasure(?:\s+Type)?|Intelligence|Frequency|Alignment|Morale|Movement|Move|Attacks?|Damage|Speed|Challenge|THAC0|Save As|Saves?|Saving Throws?|Skills|Senses|Languages|Damage (?:Resistances|Immunities|Vulnerabilities)|Condition Immunities|XP|Level|Ferocity|Size|Armor Rating|Monster Attacks|AC|HD|HP|MV|ATT|ATK|ML|AL|SV|SP|Init|Act|Crit|LV)\s*:/i.test(
       t,
     )
   ) {
     return true
   }
-  if (/^(?:AC|HD|HP|MV|ML|AL|ATT|ATK|LV|STR|DEX|CON|INT|WIS|CHA)\b/i.test(t)) return true
+  if (/^(?:Armor Class|Hit Dice|Hit Points|AC|HD|HP|MV|ML|AL|ATT|ATK|LV|THAC0|SV|STR|DEX|CON|INT|WIS|CHA)\b(?:\s|$|:)/i.test(t)) {
+    return true
+  }
   return false
 }
 
+/** True when a leading OCR line is page furniture / noise rather than a creature title. */
+function isLeadingNoiseLine(line: string): boolean {
+  const t = line.trim()
+  if (!t) return true
+  // Bare page numbers, roman numerals, or single non-word noise tokens
+  if (/^\d{1,4}$/.test(t)) return true
+  if (/^(?:page|p\.?)\s*\d+$/i.test(t)) return true
+  if (/^(?:chapter|section|appendix|part|book)\s+[\dIVXLCDM]+\b/i.test(t)) return true
+  // Short noise strings without at least 2 letters
+  const letters = (t.match(/[A-Za-z]/g) ?? []).length
+  if (letters < 2) return true
+  return false
+}
+
+function isPlausibleNameLine(line: string): boolean {
+  const t = line.trim()
+  if (!t || t.length > NAME_MAX_LEN) return false
+  if (looksLikeFieldLabelLine(t) || isLeadingNoiseLine(t)) return false
+  if (/^(?:tiny|small|medium|large|huge|gargantuan)\s+[a-z]/i.test(t)) return false
+  // Soft-wrapped paste that still looks like multiple labeled fields.
+  if ((t.match(/:\s*\S/g) || []).length >= 2) return false
+  return true
+}
+
 /**
- * Creature name from the first non-empty line, or '' when the paste starts
- * on a labeled field (common for nameless OSR blocks).
+ * Creature name from the first non-empty line (or up to line 3 if preceded by
+ * OCR page numbers / border noise), or '' when the paste starts on a labeled field.
  */
 export function extractCreatureName(text: string): string {
-  const line = firstLine(text)
-  if (!line || looksLikeFieldLabelLine(line)) return ''
-  if (line.length > NAME_MAX_LEN) return ''
-  // Soft-wrapped paste that still looks like multiple labeled fields.
-  if ((line.match(/:\s*\S/g) || []).length >= 2) return ''
-  return stripName(line)
+  const lines = text
+    .split(/\r\n|\r|\n|\u2028|\u2029/)
+    .map((l) => l.trim())
+    .filter(Boolean)
+
+  if (lines.length === 0) return ''
+
+  // If the very first line is already a stat label (nameless OSR paste), do not search further.
+  if (looksLikeFieldLabelLine(lines[0])) return ''
+
+  // If a line in the top 3 is immediately followed by a 5E size/type line, prefer it.
+  for (let i = 0; i < Math.min(3, lines.length - 1); i++) {
+    if (
+      /^(?:tiny|small|medium|large|huge|gargantuan)\s+[a-z]/i.test(lines[i + 1]) &&
+      isPlausibleNameLine(lines[i])
+    ) {
+      return stripName(lines[i])
+    }
+  }
+
+  // Otherwise scan the first 3 lines, skipping obvious OCR page numbers / noise.
+  for (let i = 0; i < Math.min(3, lines.length); i++) {
+    const candidate = lines[i]
+    if (looksLikeFieldLabelLine(candidate)) return ''
+    if (isPlausibleNameLine(candidate)) {
+      return stripName(candidate)
+    }
+    if (!isLeadingNoiseLine(candidate)) break
+  }
+
+  const fallback = firstLine(text)
+  if (!fallback || !isPlausibleNameLine(fallback)) return ''
+  return stripName(fallback)
 }
 
 function toHitDice(raw: string): number {
@@ -275,7 +331,11 @@ function toSpeedFeet(raw: string): number {
 }
 
 function stripName(name: string): string {
-  return name.replace(/[#*]+/g, '').trim()
+  return name
+    .replace(/[#*]+/g, '')
+    .replace(/\s+(?:[—–-]\s*)?(?:CREATURE|LEVEL|LV)\s+[+−-]?\d+\s*$/i, '')
+    .replace(/\s*\((?:CR|LV|LEVEL)\s+[\d/]+\)\s*$/i, '')
+    .trim()
 }
 
 function titleCase(s: string): string {
@@ -363,18 +423,33 @@ function parseFiveEActions(text: string): {
   const bonuses: number[] = []
 
   for (const line of candidates) {
-    const action = line.match(
-      /^([A-Z][A-Za-z '\-]+)\.\s+(?:Melee|Ranged|Melee or Ranged)[^:]*:\s*([+−-]\d+)\s+to hit.*?\bHit:\s*(?:\d+\s*)?\((\d+d\d+(?:\s*[+-]\s*\d+)?)\)(.*)$/i,
-    )
+    const action =
+      line.match(
+        /^([A-Z][A-Za-z0-9 '’\-()/]+?)[.:,]\s+(?:Melee|Ranged|Melee or Ranged)[^:.;]*[:.]?\s*([+−-]?\d+)\s+to\s+hit\b.*?\bHit\s*[:.]?\s*(?:\d+\s*)?\(?(\d+d\d+(?:\s*[+−-]\s*\d+)?)\)?(.*)$/i,
+      ) ??
+      line.match(
+        /^([A-Z][A-Za-z0-9 '’\-()/]+?)[.:]\s*([+−-]\d+)\s+to\s+hit\b.*?(?:\bHit\s*[:.]?\s*)?(?:\d+\s*)?\(?(\d+d\d+(?:\s*[+−-]\s*\d+)?)\)?(.*)$/i,
+      )
     if (!action) continue
     const bonus = Number(action[2].replace('−', '-'))
-    const note = action[4]
-      .replace(/^[,.\s]+/, '')
-      .replace(/\b(?:bludgeoning|piercing|slashing)\s+damage\b\.?/i, '')
+    let note = action[4]
+      .replace(/^[),.\s]+/, '')
+      .replace(
+        /^(?:bludgeoning|piercing|slashing|poison|fire|cold|acid|lightning|necrotic|radiant|psychic|force|thunder)\s+damage\b[.,]?\s*/i,
+        '',
+      )
+      .replace(/^(?:plus|and)\s+/i, '')
+      .replace(/\.$/, '')
       .trim()
-    attacks.push(
-      `${action[1].trim()} ${action[3].replace(/\s+/g, '')}${note ? ` (${note})` : ''}`,
-    )
+
+    if (note.length > 72) {
+      const firstSentence = note.split(/\.\s+/)[0]?.trim() ?? note
+      note = firstSentence.length <= 72 ? firstSentence : `${firstSentence.slice(0, 69).trim()}…`
+    }
+
+    const cleanName = action[1].replace(/\s*\([^)]*\)\s*$/, '').trim() || action[1].trim()
+    const cleanDice = action[3].replace(/\s+/g, '').replace('−', '-')
+    attacks.push(`${cleanName} ${cleanDice}${note ? ` (${note})` : ''}`)
     if (Number.isFinite(bonus)) bonuses.push(bonus)
   }
 
@@ -397,13 +472,18 @@ function collectTraits(text: string, skipPatterns: RegExp[]): string {
 
   for (const line of lines) {
     if (skipPatterns.some((re) => re.test(line))) continue
-    const trait = line.match(/^([A-Z][A-Za-z .'-]+)\.\s+(.+)$/)
+    const trait = line.match(/^([A-Z][A-Za-z0-9 .'\-()/]+?)\.\s+(.+)$/)
     if (trait) {
       traits.push(`${trait[1].trim()}: ${trait[2].trim()}`)
       continue
     }
-    const colon = line.match(/^([A-Z][A-Za-z .'-]+):\s+(.+)$/)
-    if (colon && !/^(AC|HP|HD|MV|ML|AL|ATK|Att|Speed|Armor|Init|Act|SV|SP|Level|Perception)/i.test(colon[1])) {
+    const colon = line.match(/^([A-Z][A-Za-z0-9 .'\-()/]+?):\s+(.+)$/)
+    if (
+      colon &&
+      !/^(AC|HP|HD|MV|ML|AL|ATK|Att|Speed|Armor|Init|Act|SV|SP|Level|Perception|Saving Throws|Skills|Senses|Languages|Damage Resistances|Damage Immunities|Damage Vulnerabilities|Condition Immunities|Challenge|Proficiency Bonus)/i.test(
+        colon[1],
+      )
+    ) {
       traits.push(`${colon[1].trim()}: ${colon[2].trim()}`)
     }
   }
@@ -445,7 +525,10 @@ function parse5e(text: string): { forge: Partial<ForgeMonster>; fieldsFound: str
   let name = extractCreatureName(text)
   if (name) fields.push('name')
 
-  const typeLine = lines[1] ?? ''
+  const typeLine =
+    lines.slice(0, 4).find((l) => /^(?:tiny|small|medium|large|huge|gargantuan)\b/i.test(l)) ??
+    lines[1] ??
+    ''
   const typeMatch = typeLine.match(
     /^(?:tiny|small|medium|large|huge|gargantuan)\s+([a-z]+(?:\s+[a-z]+)?)\s*,?\s*(.*)$/i,
   )
@@ -470,11 +553,13 @@ function parse5e(text: string): { forge: Partial<ForgeMonster>; fieldsFound: str
   const hpLine = lineValue(text, /hit points?\s*:?\s*([^\n]+)/i)
   const exactHp = firstNumber(hpLine)
   let hd = DEFAULT_FORGE.hd
-  const hdFromParen = hpLine.match(/\((\d+d\d+(?:\s*[+-]\s*\d+)?)\)/i)
+  const hdFromParen = hpLine.match(/\(?(\d+d\d+(?:\s*[+−-]\s*\d+)?)\)?/i)
   if (hdFromParen) {
-    hd = toHitDice(hdFromParen[1])
+    hd = toHitDice(hdFromParen[1].replace('−', '-'))
     fields.push('hd')
-  } else if (exactHp !== undefined) {
+  } else if (exactHp !== undefined && exactHp > 0) {
+    hd = Math.max(1, Math.round(exactHp / 4.5))
+    fields.push('hd')
     warnings.push('Hit Points had no hit-dice expression; exact HP was preserved but HD needs review.')
   }
 
@@ -489,8 +574,10 @@ function parse5e(text: string): { forge: Partial<ForgeMonster>; fieldsFound: str
 
   const traitsText = collectTraits(text, [
     /^[A-Z][A-Za-z .'-]+\s*,/i,
-    /^(?:armor class|hit points?|speed|str|dex|con|int|wis|cha|actions?|challenge)/i,
+    /^(?:armor class|hit points?|speed|str|dex|con|int|wis|cha|actions?|challenge|saving throws|skills|senses|languages|damage (?:vulnerabilities|resistances|immunities)|condition immunities|proficiency bonus)/i,
     /^[A-Z]{2,}\s+\d+/,
+    /\b(?:Melee|Ranged|Melee or Ranged)\s+(?:Weapon|Spell)\s+Attack\b/i,
+    /\bto\s+hit\b.*\bHit\s*[:.]/i,
   ])
 
   if (traitsText) fields.push('traits')
@@ -526,38 +613,52 @@ function parseOse(text: string): { forge: Partial<ForgeMonster>; fieldsFound: st
   const name = extractCreatureName(text)
   if (name) fields.push('name')
 
-  const acRaw = lineValue(text, /\bac\s*:?\s*([^\n]+)/i)
+  const acRaw = lineValue(text, /(?:armor class|\bac)\s*:?\s*([^\n]+)/i)
   const ac = acRaw ? toAscendingAc(acRaw) : DEFAULT_FORGE.ac
   if (acRaw) fields.push('ac')
 
-  const hdRaw = lineValue(text, /\bhd\s*:?\s*([^\n]+)/i)
+  const hdRaw = lineValue(text, /(?:hit dice|\bhd)\s*:?\s*([^\n]+)/i)
   const hdProfile = parseHitDice(hdRaw, DEFAULT_FORGE.hd as number)
   const hd = hdRaw ? hdProfile.notation : DEFAULT_FORGE.hd
   if (hdRaw) fields.push('hd')
   const exactHp = hdRaw.match(/\((\d+)\s*hp\)/i)?.[1]
 
-  const attRaw = lineValue(text, /\batt\s*:?\s*([^\n]+)/i)
-  const atkText = attRaw
-    ? normalizeAttacks(attRaw.replace(/\s*[×x]\s*/gi, ' ').replace(/\+/g, ' '))
-    : DEFAULT_FORGE.atkText
-  if (attRaw) fields.push('attacks')
+  const attRaw = lineValue(text, /(?:no\.\s*of\s*attacks|attacks?|\batt)\s*:?\s*([^\n]+)/i)
+  const dmgRaw = lineValue(text, /damage(?:\/attack)?\s*:?\s*([^\n]+)/i)
+  let atkText = DEFAULT_FORGE.atkText
+  if (attRaw && dmgRaw && !DICE_RE.test(attRaw)) {
+    const attackParts = attRaw.split('/').map((s) => s.trim()).filter(Boolean)
+    const dmgParts = dmgRaw.split('/').map((s) => s.trim()).filter(Boolean)
+    atkText = attackParts
+      .map((part, i) => `${part} ${dmgParts[i] ?? dmgParts[0] ?? '1d6'}`)
+      .join('; ')
+    fields.push('attacks')
+  } else if (attRaw) {
+    atkText = normalizeAttacks(attRaw.replace(/\s*[×x]\s*/gi, ' ').replace(/\+/g, ' '))
+    fields.push('attacks')
+  } else if (dmgRaw) {
+    atkText = normalizeAttacks(dmgRaw)
+    fields.push('attacks')
+  }
 
-  const mvRaw = lineValue(text, /\bmv\s*:?\s*([^\n]+)/i)
+  const mvRaw = lineValue(text, /(?:movement|move|\bmv)\s*:?\s*([^\n]+)/i)
   const speed = mvRaw ? toSpeedFeet(mvRaw) : DEFAULT_FORGE.speed
   if (mvRaw) fields.push('speed')
 
-  const mlRaw = lineValue(text, /\bml\s*:?\s*(\d+)/i)
+  const mlRaw = lineValue(text, /(?:morale|\bml)\s*:?\s*(\d+)/i)
   const ml = mlRaw ? toMorale(mlRaw) : DEFAULT_FORGE.ml
   if (mlRaw) fields.push('morale')
 
-  const alRaw = lineValue(text, /\bal\s*:?\s*([^\n]+)/i)
+  const alRaw = lineValue(text, /(?:alignment|\bal)\s*:?\s*([^\n]+)/i)
   const al = alRaw ? toAlignment(alRaw) : DEFAULT_FORGE.al
   if (alRaw) fields.push('alignment')
   const thac0Raw = lineValue(text, /\bthac0\s*:?\s*(\d+)/i)
   const xpRaw = lineValue(text, /\bxp\s*:?\s*([\d,]+)/i)
-  const svRaw = lineValue(text, /\bsv\s*:?\s*([^\n]+)/i)
+  const svRaw = lineValue(text, /(?:save as|saves?|\bsv)\s*:?\s*([^\n]+)/i)
 
-  const traitsText = collectTraits(text, [/^(?:AC|HD|Att|THAC0|MV|SV|ML|AL|XP)\b/i])
+  const traitsText = collectTraits(text, [
+    /^(?:Armor Class|Hit Dice|No\.\s*of\s*Attacks|Attacks?|Damage|Movement|Move|Morale|Alignment|Save As|Saves?|AC|HD|Att|THAC0|MV|SV|ML|AL|XP)\b/i,
+  ])
   if (svRaw) fields.push('saves')
 
   return {
@@ -1138,17 +1239,38 @@ function extractSupplementalFields(text: string): {
     .find(Boolean)
   const abilityLine = lines.find(
     (line) =>
-      /\bSTR\b/i.test(line) &&
-      /\bDEX\b/i.test(line) &&
+      /\bSTR\b\s*[:=]?\s*[+−-]?\d+/i.test(line) &&
+      /\bDEX\b\s*[:=]?\s*[+−-]?\d+/i.test(line) &&
       (/\bCON\b/i.test(line) || /\bWIS\b/i.test(line)),
   )
+  let twoRowAbilityStats: string | undefined
+  if (!abilityLine) {
+    const headerIdx = lines.findIndex((line) =>
+      /^STR[\s|¦,]+DEX[\s|¦,]+CON[\s|¦,]+INT[\s|¦,]+WIS[\s|¦,]+CHA$/i.test(line),
+    )
+    if (headerIdx >= 0 && headerIdx + 1 < lines.length) {
+      const labels = ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA']
+      const matches = Array.from(
+        lines[headerIdx + 1].matchAll(/\b(\d{1,2})\s*(?:\(\s*([+−-]?\s*\d+)\s*\))?/g),
+      )
+      if (matches.length >= 6) {
+        twoRowAbilityStats = labels
+          .map((lbl, idx) => {
+            const m = matches[idx]
+            const mod = m[2] ? ` (${m[2].replace(/\s+/g, '')})` : ''
+            return `${lbl} ${m[1]}${mod}`
+          })
+          .join(' ')
+      }
+    }
+  }
   const shadowdarkStats = lines.find(
     (line) =>
       /^(?:stats?\s*:?\s*)?S\s*[+−-]?\d+/i.test(line) &&
       /\bD\s*[+−-]?\d+/i.test(line) &&
       /\bW\s*[+−-]?\d+/i.test(line),
   )
-  const stats = labelledStats || abilityLine || shadowdarkStats
+  const stats = labelledStats || abilityLine || twoRowAbilityStats || shadowdarkStats
   if (stats) {
     partial.stats = stats
     fieldsFound.push('stats')
